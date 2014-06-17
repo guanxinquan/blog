@@ -120,15 +120,14 @@ FST（Finite State Transducer，一种有限自动机，或者称为Mealy machin
 <p>一个使用探测法实现的HashMap，key是FST Node生成的hash值，value是FST node存放在FST bytes数组中的下标。（<strong>FST HashMap不是构建FST必须的组成部分，但是，HashMap能够加快判断某个节点是否已经在FST bytes中，HashMap仅用于FST的构建过程</strong>）。</p>
 <h3 id="Frontier">Frontier</h3>
 <p>是一个数组，用于存放未转换到FST byte数组中的数据信息。</p>
-<blockquote>
-<p>为了能够理解FST的构建过程，需要先分析Hash算法。<br>Hash算法并不是FST中必不可缺的部分，在构建过程中FST使用HashMap来快速判断测试节点是否已经被写入到FST bytes中。HashMap的value是node在FST bytes中的实际存储位置（数组的下标）。<br>HashMap中的key通过计算节点中所有的arcs信息生成的。其中，每个arc被考虑的属性包括，label（字符）、targetNode（下一个节点的地址）、outPut（节点输出）、isFinal（是否是终止弧线）、nextFinal（下一个终止弧线—这个参数在测试过程中没有发现被赋值）。</p>
-<p>将node1添加到FST bytes时，先通过hash算法计算node1对应的key，如果key在Hashmap中已经有对应的值value，那么这个value就是与node1 hash值相同的节点（称为node2）存储在FST bytes中的实际数组下标，FST从bytes数组中转换出node2，判断node1和node2是否相等（所有的arc值是否相等），如果相等，node1就没有必要再添加到FST bytes中（相当于FST的尾部进行了归并）。</p>
-</blockquote>
+<p><em>为了能够理解FST的构建过程，需要先分析Hash算法。</em></p>
+<p><em>Hash算法并不是FST中必不可缺的部分，在构建过程中FST使用HashMap来快速判断测试节点是否已经被写入到FST bytes中。HashMap的value是node在FST bytes中的实际存储位置（数组的下标）。<br>HashMap中的key通过计算节点中所有的arcs信息生成的。其中，每个arc被考虑的属性包括，label（字符）、targetNode（下一个节点的地址）、outPut（节点输出）、isFinal（是否是终止弧线）、nextFinal（下一个终止弧线—这个参数在测试过程中没有发现被赋值）。</em></p>
+<p><em>将node1添加到FST bytes时，先通过hash算法计算node1对应的key，如果key在Hashmap中已经有对应的值value，那么这个value就是与node1 hash值相同的节点（称为node2）存储在FST bytes中的实际数组下标，FST从bytes数组中转换出node2，判断node1和node2是否相等（所有的arc值是否相等），如果相等，node1就没有必要再添加到FST bytes中（相当于FST的尾部进行了归并）。</em></p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="3a8xz1yrjz6oc5ai" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="slsnrehhwy2phs9p" class="article-share-link">Share</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/fst/">fst</a></li></ul>
