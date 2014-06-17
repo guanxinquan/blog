@@ -3,19 +3,17 @@
 <head>
   <meta charset="utf-8">
   
-  <title>青春纪念 | MR.GUAN</title>
+  <title>Category: 算法 | MR.GUAN</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="今天开始在这里写博客了，留个影，纪念一下。">
-<meta property="og:type" content="article">
-<meta property="og:title" content="青春纪念">
-<meta property="og:url" content="http://guanxinquan.github.io/blog/blog/2014/06/17/firstblog/">
+  <meta name="description" content="just for fun">
+<meta property="og:type" content="website">
+<meta property="og:title" content="MR.GUAN">
+<meta property="og:url" content="http://guanxinquan.github.io/blog/blog/categories/算法/">
 <meta property="og:site_name" content="MR.GUAN">
-<meta property="og:description" content="今天开始在这里写博客了，留个影，纪念一下。">
-<meta property="og:image" content="/blog/pic/firstblog/myself.jpg">
-<meta property="og:image" content="/blog/pic/firstblog/mylady.jpg">
+<meta property="og:description" content="just for fun">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="青春纪念">
-<meta name="twitter:description" content="今天开始在这里写博客了，留个影，纪念一下。">
+<meta name="twitter:title" content="MR.GUAN">
+<meta name="twitter:description" content="just for fun">
   
     <link rel="alternative" href="/atom.xml" title="MR.GUAN" type="application/atom+xml">
   
@@ -60,12 +58,18 @@
   </div>
 </header>
       <div class="outer">
-        <section id="main"><article id="post-firstblog" class="article article-type-post" itemscope itemprop="blogPost">
+        <section id="main">
+  
+    <article id="post-lucene_FST_parser" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
-    <a href="/blog/2014/06/17/firstblog/" class="article-date">
-  <time datetime="2014-06-17T06:58:01.000Z" itemprop="datePublished">Jun 17 2014</time>
+    <a href="/blog/2014/06/17/lucene_FST_parser/" class="article-date">
+  <time datetime="2014-06-17T09:39:40.000Z" itemprop="datePublished">Jun 17 2014</time>
 </a>
     
+  <div class="article-category">
+    <a class="article-category-link" href="/blog/categories/算法/">算法</a>
+  </div>
+
   </div>
   <div class="article-inner">
     
@@ -73,8 +77,8 @@
       <header class="article-header">
         
   
-    <h1 class="article-title" itemprop="name">
-      青春纪念
+    <h1 itemprop="name">
+      <a class="article-title" href="/blog/2014/06/17/lucene_FST_parser/">lucene中的FST算法分析</a>
     </h1>
   
 
@@ -82,38 +86,30 @@
     
     <div class="article-entry" itemprop="articleBody">
       
-        <p>今天开始在这里写博客了，留个影，纪念一下。</p>
-<p><a id="more"></a><br><img src="/blog/pic/firstblog/myself.jpg" alt="我自己"><br>还有我媳妇<br><img src="/blog/pic/firstblog/mylady.jpg" alt="媳妇和我"></p>
-
+        <h1 id="前言">前言</h1>
+<p>FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行的过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。</p>
+<p>在FST构建过程中，term的文本信息(按照字典顺序排序）作为FST的input，term的存储位置（或者次序）作为FST的output，<input,output>二元组将以FST的形式存储在内存中（<strong>请注意input和output都是有序的</strong>）。检索时，根据input，通过计算FST中的路径上的权值信息，获取到output数据，最终在磁盘上定位term的其它附加信息。同时FST还能够快速的判断一个term是否在lucene中。<br>
+        
+          <p class="article-more-link">
+            <a href="/blog/2014/06/17/lucene_FST_parser/#more">Read More</a>
+          </p>
+        
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/firstblog/" data-id="gzz57t2g0m4yex9j" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="3a8xz1yrjz6oc5ai" class="article-share-link">Share</a>
       
       
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/生活/">生活</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/fst/">fst</a></li></ul>
 
     </footer>
   </div>
   
-    
-<nav id="article-nav">
-  
-    <a href="/blog/2014/06/17/lucene_FST_parser/" id="article-nav-newer" class="article-nav-link-wrap">
-      <strong class="article-nav-caption">Newer</strong>
-      <div class="article-nav-title">
-        
-          lucene中的FST算法分析
-        
-      </div>
-    </a>
-  
-  
-</nav>
-
-  
 </article>
 
+
+  
+  
 </section>
         
           <aside id="sidebar">

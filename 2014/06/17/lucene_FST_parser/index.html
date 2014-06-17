@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>lucene中的FST算法分析 | MR.GUAN</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="前言
+FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行的过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。
+在FST构">
+<meta property="og:type" content="article">
+<meta property="og:title" content="lucene中的FST算法分析">
+<meta property="og:url" content="http://guanxinquan.github.io/blog/blog/2014/06/17/lucene_FST_parser/">
+<meta property="og:site_name" content="MR.GUAN">
+<meta property="og:description" content="前言
+FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行的过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。
+在FST构">
+<meta property="og:image" content="/blog/pic/lucene_fst/final_fst.jpg">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="lucene中的FST算法分析">
+<meta name="twitter:description" content="前言
+FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行的过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。
+在FST构">
+  
+    <link rel="alternative" href="/atom.xml" title="MR.GUAN" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png">
+  
+  <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  <link rel="stylesheet" href="/blog/css/style.css" type="text/css">
+  
+</head>
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/blog//" id="logo">MR.GUAN</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/blog//">Home</a>
+        
+          <a class="main-nav-link" href="/blog//archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" results="0" class="search-form-input" placeholder="Search"><input type="submit" value="&#xF002;" class="search-form-submit"><input type="hidden" name="q" value="site:http://guanxinquan.github.io/blog"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main"><article id="post-lucene_FST_parser" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/blog/2014/06/17/lucene_FST_parser/" class="article-date">
+  <time datetime="2014-06-17T09:39:40.000Z" itemprop="datePublished">Jun 17 2014</time>
+</a>
+    
+  <div class="article-category">
+    <a class="article-category-link" href="/blog/categories/算法/">算法</a>
+  </div>
+
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      lucene中的FST算法分析
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h1 id="前言">前言</h1>
+<p>FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行的过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。</p>
+<p>在FST构建过程中，term的文本信息(按照字典顺序排序）作为FST的input，term的存储位置（或者次序）作为FST的output，<input,output>二元组将以FST的形式存储在内存中（<strong>请注意input和output都是有序的</strong>）。检索时，根据input，通过计算FST中的路径上的权值信息，获取到output数据，最终在磁盘上定位term的其它附加信息。同时FST还能够快速的判断一个term是否在lucene中。<br><a id="more"></a><br>实际上FST相当于term在内存中的一个索引，lucene使用FST能够快速确定系统中是否存在查询的term，如果存在，能够快速定位其信息存放的具体位置。</input,output></p>
+<p>FST与trie tree结构提供相似的功能，但是，在内存中存储更高效。</p>
+<p>举个例子，我们输入FST的数据如下：</p>
+<pre><code>String inputValues[] = {<span class="string">"mop"</span>,<span class="string">"moth"</span>,<span class="string">"pop"</span>,<span class="string">"star"</span>,<span class="string">"stop"</span>,<span class="string">"top"</span>};
+<span class="keyword">long</span> outputValues[] = {<span class="number">0</span>,<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">4</span>,<span class="number">5</span>};
+</code></pre><p>最终获得的FST图：</p>
+<p><img src="/blog/pic/lucene_fst/final_fst.jpg" alt="最终生成的FST图"></p>
+<p>从上图我们可以计算每个term的文本对应的output值，例如我们要计算stop：</p>
+<ol>
+<li>s-&gt;23  的弧线s/3(s表示起始节点),</li>
+<li>23-&gt;21 的弧线t,</li>
+<li>21-&gt;11 的弧线o/1，</li>
+<li>11-&gt;E  的弧线p（E表示终止节点）。</li>
+</ol>
+<p>因此，<code>3+0+1+0=4</code>，因此，stop对应的值为4.</p>
+<h1 id="FST的构建">FST的构建</h1>
+<h2 id="数据结构">数据结构</h2>
+<h3 id="FST_bytes">FST bytes</h3>
+<p>FST中的bytes数组，存储FST数据信息。FST bytes存储了FST图的完整信息（通过FST bytes，可以构建一个FST图）。</p>
+<h3 id="FST_node">FST node</h3>
+<p>表示FST图的一个节点，有两种实现类型，UnCompiledNode（尚未存放到FST bytes中的节点）和CompiledNode（已经存放到FST bytes中的节点）。这个结构在FST构建过程中用于存储临时数据。</p>
+<h3 id="FST_arc">FST arc</h3>
+<p>用于表示Node间的弧线，在构建FST时，存储两个FST node节点间的弧线信息（弧线的表示的字符和弧线上的权值）。</p>
+<h3 id="FST_HashMap">FST HashMap</h3>
+<p>一个使用探测法实现的HashMap，key是FST Node生成的hash值，value是FST node存放在FST bytes数组中的下标。（<strong>FST HashMap不是构建FST必须的组成部分，但是，HashMap能够加快判断某个节点是否已经在FST bytes中，HashMap仅用于FST的构建过程</strong>）。</p>
+<h3 id="Frontier">Frontier</h3>
+<p>是一个数组，用于存放未转换到FST byte数组中的数据信息。</p>
+<blockquote>
+<p>为了能够理解FST的构建过程，需要先分析Hash算法。<br>Hash算法并不是FST中必不可缺的部分，在构建过程中FST使用HashMap来快速判断测试节点是否已经被写入到FST bytes中。HashMap的value是node在FST bytes中的实际存储位置（数组的下标）。<br>HashMap中的key通过计算节点中所有的arcs信息生成的。其中，每个arc被考虑的属性包括，label（字符）、targetNode（下一个节点的地址）、outPut（节点输出）、isFinal（是否是终止弧线）、nextFinal（下一个终止弧线—这个参数在测试过程中没有发现被赋值）。</p>
+<p>将node1添加到FST bytes时，先通过hash算法计算node1对应的key，如果key在Hashmap中已经有对应的值value，那么这个value就是与node1 hash值相同的节点（称为node2）存储在FST bytes中的实际数组下标，FST从bytes数组中转换出node2，判断node1和node2是否相等（所有的arc值是否相等），如果相等，node1就没有必要再添加到FST bytes中（相当于FST的尾部进行了归并）。</p>
+</blockquote>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="3a8xz1yrjz6oc5ai" class="article-share-link">Share</a>
+      
+      
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/fst/">fst</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/blog/2014/06/17/firstblog/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">青春纪念</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Categories</h3>
+    <div class="widget">
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/blog/categories/算法/">算法</a><span class="category-list-count">1</span></li></ul>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/fst/">fst</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/生活/">生活</a><span class="tag-list-count">1</span></li></ul>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tag Cloud</h3>
+    <div class="widget tagcloud">
+      <a href="/blog/tags/fst/" style="font-size: NaNpx;">fst</a><a href="/blog/tags/生活/" style="font-size: NaNpx;">生活</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/blog/archives/2014/06">June 2014</a><span class="archive-list-count">2</span></li></ul>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recents</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/blog/2014/06/17/lucene_FST_parser/">lucene中的FST算法分析</a>
+          </li>
+        
+          <li>
+            <a href="/blog/2014/06/17/firstblog/">青春纪念</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2014 xinquan.guan<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/blog//" class="mobile-nav-link">Home</a>
+  
+    <a href="/blog//archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+  <link rel="stylesheet" href="/blog/fancybox/jquery.fancybox.css" type="text/css">
+  <script src="/blog/fancybox/jquery.fancybox.pack.js" type="text/javascript"></script>
+
+
+<script src="/blog/js/script.js" type="text/javascript"></script>
+  </div>
+</body>
+</html>
