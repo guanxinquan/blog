@@ -16,6 +16,26 @@ FST（Finite State Transducer，一种有限自动机，或者称为Mealy machin
 FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行的过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。
 在FST构">
 <meta property="og:image" content="/blog/pic/lucene_fst/final_fst.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/mop_input.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/month_input.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/month_input_2.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/month_input_3.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/month_input_4.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/month_input_5.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/start_input.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/stop_input_1.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/stop_input_2.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/top_input.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/final.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/37_output.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/9_output.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/7_output.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/2_output.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/13_output.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/11_output.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/23_output.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/21_output.jpg">
+<meta property="og:image" content="/blog/pic/lucene_fst/15_output.jpg">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="lucene中的FST算法分析">
 <meta name="twitter:description" content="前言
@@ -128,11 +148,92 @@ FST（Finite State Transducer，一种有限自动机，或者称为Mealy machin
 <li>计算公共前缀。对于新输入的NInput（new input），首先要计算其与上次输出的LInput（Lastest input，LInput数据存放在Frontier中）之间的公共前缀prefix，之后调用freezeTail，将Frontier中的LInput的后缀转换到FST bytes数组中（<strong>需要注意，输入的数据（label）是按照字典顺序有序的，因此求公共前缀的时候，只需要和NInput的前一个输入节点对比即可,后缀是指，除了公共前缀和公共前缀直接后继节点外的节点，例如：aaabc和aacae的公共前缀是aa，此时aaabc的后缀是bc</strong>）。</li>
 <li>将后缀部分存储到FST bytes中。在freezeTail过程中，会将LInput的后缀，从后向前的顺序逐个存储到FST bytes中，每个节点的存储步骤如下，<br>2.1  node通过Hash算法判断其是否已经在bytes中，进行如下操作：<br>2.1.1  HashMap中找不到key对应的value，将新节点添加到FST bytes中（<strong>添加节点，实际是将节点包含的所有arc都写入到FST bytes中，并不是将节点本身写入FST bytes中</strong>）；<br>2.1.2  HashMap中找到key对应的value，从FST bytes中转换出preNode，可能出现下面的两种情况：<br>与当前node的值相等，直接返回preNode的存储位置pos相当于尾部节点的合并。<br>如果不相等，那么继续探测，回到步骤2.1。</li>
 </ol>
+<h2 id="构建过程模拟">构建过程模拟</h2>
+<h3 id="FST_bytes中的Flag字段含义">FST bytes中的Flag字段含义</h3>
+<p>每个arc存储在FST bytes中都会有一个flag字段，FST通过flag字段可以判断出FST bytes中有几个bytes与当前arc相关，并且携带了包含当前arc节点的出度信息等。arc的含义如下：</p>
+<ul>
+<li>Final arc： 1         表示这是一个Final arc，arc指向一个终止状态E。</li>
+<li>Last arc：2        表示arc是包含当前arc的节点的最后一个arc；</li>
+<li>Target next：4       当前arc的下一个arc（FST图上的下一个）是包含当前arc的节点的最后一个arc的前驱arc（FST bytes数组位置，向前邻接的那个arc）。</li>
+<li>Stop node：8        终止状态E。</li>
+<li>Has output: 16    当前arc有output值（表示output不为0）</li>
+</ul>
+<h3 id="构建过程">构建过程</h3>
+<p>input和output的数据如下：</p>
+<pre><code>String inputValues[] = {<span class="string">"mop"</span>,<span class="string">"moth"</span>,<span class="string">"pop"</span>,<span class="string">"star"</span>,<span class="string">"stop"</span>,<span class="string">"top"</span>};
+<span class="keyword">long</span> outputValues[] = {<span class="number">0</span>,<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">4</span>,<span class="number">5</span>};
+</code></pre><h4 id="输入mop">输入mop</h4>
+<p><img src="/blog/pic/lucene_fst/mop_input.jpg" alt="after mop input"></p>
+<p>输入mop后，m/o/p三个弧线的信息都保存在frontier中（frontier表示尚未存放到FST bytes中的数据）。FSTbytes数据位空。</p>
+<h4 id="输入moth">输入moth</h4>
+<p><img src="/blog/pic/lucene_fst/month_input.jpg" alt="after month input"></p>
+<p>输入moth时，moth与先前的mop有mo两个公共前缀，在freezeTail过程中，将先前弧线p后面的节点（节点3）存储到FST bytes中，由于节点3没有任何出度，因此FSTbytes中的数据仍然是空，而p的下一个节点是FSTbytes中的-1的位置（-1 表示终止）。之后将th添加到frontier中，增加两个弧线t/1和h。</p>
+<h4 id="输入pop">输入pop</h4>
+<p>输入pop后，pop与moth没有公共的前缀，因此在freezeTail过程中，需要将frontier中的4,3,2,1都存储到FST bytes中。<br> 1 . 由于4没有出度，因此3-&gt;4的h弧度的下一节点为-1。<br> 2 . 存储节点3，有一个出度3-&gt;4，值为h，因此如下图：11表示8+2+1=stopNode(-1)+lastArc+FinalArc。stopNode说明当前弧是一个指向终点的弧（stopNode，FinalArc），并且当前弧是当前节点的最后一条弧线（FinalArc）。104是h的ascii值。<br><img src="/blog/pic/lucene_fst/month_input_2.jpg" alt="after month input"></p>
+<p>注：在每个节点被写入后，会将这个节点的所有数据倒置，写入结束后，FST bytes变为（0,104,11）。数组0的位置永远存储的是0.<br> 3 . 存储节点2，节点2有两个弧度：<br><em>先写入p，9和112。9= stop_node+ final_arc，表示弧线p是终止节点。
+</em>写入t/1，22、116 和1。22表示16 + 4 + 2 = has_output + targetNext + last_arc，说明，t/1这个弧线有output，弧线的后继弧线是紧邻着的那条（就是FST bytes中左侧（小端）的那条）并且是当前节点的最后一个arc</p>
+<p>(<strong>注：由于存储结束后fst会将节点的所有arcs数据倒置，因此与t/1邻接的弧线就是h那条弧线，反转后，如下图：可以看出t/1的向前邻接的节点是h。</strong>）</p>
+<p><img src="/blog/pic/lucene_fst/month_input_3.jpg" alt="after month input"></p>
+<p> 4 . 存储节点1并反转后，6 表示target_next和last_arc.</p>
+<p><img src="/blog/pic/lucene_fst/month_input_4.jpg" alt="after month input"></p>
+<p> 5 . freezeTail结束后，将pop放入frontier中。如下图。</p>
+<p><img src="/blog/pic/lucene_fst/month_input_5.jpg" alt="after month input"></p>
+<h4 id="输入start">输入start</h4>
+<p><img src="/blog/pic/lucene_fst/start_input.jpg" alt="after start input"></p>
+<h4 id="输入stop">输入stop</h4>
+<p><img src="/blog/pic/lucene_fst/stop_input_1.jpg" alt="after stop input"></p>
+<p><img src="/blog/pic/lucene_fst/stop_input_2.jpg" alt="after stop input"></p>
+<h4 id="输入top">输入top</h4>
+<p><img src="/blog/pic/lucene_fst/top_input.jpg" alt="after top input"></p>
+<h4 id="最后的结果">最后的结果</h4>
+<p><img src="/blog/pic/lucene_fst/final.jpg" alt="after final input"></p>
+<h3 id="还原FST图">还原FST图</h3>
+<p>FST bytes数组中存储了FST图的完整信息，因此，我们可以根据FST bytes中的数据，转换出FST图，下面我们描述这个转换过程。<br>由 FST bytes 数组中的24-37可以获得第一个节点的出度：</p>
+<h5 id="第一个节点37号开始">第一个节点37号开始</h5>
+<ol>
+<li>37 flag为0，表示不是last arc，不是Target_next，不是has_output.不是last_arc表示邻接的是兄弟arc，不是has_output表示没有输出，不是target_next表示存储了arc的下一个arc的地址，因此9位置表示下一个arc的起始地址。</li>
+<li>34 flag为16 表示有output，没有last arc，邻接的是兄弟arc，没有target_next，因此，2是output，13是下一个arc的位置。</li>
+<li>30 flag 为20 表示有output，没有last arc，有target_next，因此3表示output，邻接的是兄弟arc，节点所有的arc读出后，邻接的arc是当前arc的下一个节点。</li>
+<li>27 flag 为18 表示有output，是last arc，不是target_next,不是final。当前arc的下一个arc为13，output是5. 因此步骤3的下一个arc是23.（因为27表示的arc已经是当前节点的最后一个arc（即last_arc），因此邻接的节点23是标有target_next（就是30那个）的下一个arc）。</li>
+</ol>
+<p><img src="/blog/pic/lucene_fst/37_output.jpg" alt="after 37 output"></p>
+<h5 id="9的出度">9的出度</h5>
+<p>由9的出度得到如下：flag是6，是last¬_arc和target_next，因此7是当前arc的下一个arc，而且当前节点仅有一个出度。</p>
+<p><img src="/blog/pic/lucene_fst/9_output.jpg" alt="after 9 output"></p>
+<h5 id="7的出度">7的出度</h5>
+<p>flag是9，表示是一个终点arc，arc的指向结束状态E。并且不是last_arc，因此，5就是其兄弟节点。<br>5 flag是22，has_output,target_next,last_arc，因此1是output，并且是本节点最后的arc，当前arc的下一个arc，是邻接的那一个（就是2那个）。</p>
+<p><img src="/blog/pic/lucene_fst/7_output.jpg" alt="after 7 output"></p>
+<h5 id="2的出度">2的出度</h5>
+<p>由2的出度如下，flag是11，表示stop_node, final_arc,last_arc，因此当前arc是当前节点的最后一条arc，并且是一个终止arc。</p>
+<p><img src="/blog/pic/lucene_fst/2_output.jpg" alt="after 2 output"></p>
+<h5 id="13的出度">13的出度</h5>
+<p><img src="/blog/pic/lucene_fst/13_output.jpg" alt="after 13 output"></p>
+<h5 id="11的出度">11的出度</h5>
+<p><img src="/blog/pic/lucene_fst/11_output.jpg" alt="after 11 output"></p>
+<h5 id="23的出度">23的出度</h5>
+<p><img src="/blog/pic/lucene_fst/23_output.jpg" alt="after 23 output"></p>
+<h5 id="21的出度">21的出度</h5>
+<p><img src="/blog/pic/lucene_fst/21_output.jpg" alt="after 21 output"></p>
+<h5 id="15的出度">15的出度</h5>
+<p><img src="/blog/pic/lucene_fst/15_output.jpg" alt="after 15 output"></p>
+<h3 id="检索过程">检索过程</h3>
+<p>cachedRootArcs 一个128个元素的arc数组，存储每个ascii字符对应的起始弧线。例如：要检索以a开始的term，cachedRootArcs[97]就是起始弧线。<br>注意，系统内部仅存储以上图S开始的那些弧线，其它弧线都是通过对FST的bytes数组计算获得。<br>因此，在term的查询过程中，首先通过cachedRootArcs获取term首字母对应的弧线（即其在数组中对应的下标位置），之后按照上面提到过的方式转换其它弧度，按照图的查找算法。如果要查找以某个term开始的所有terms，则按照上述方法，先查找到term，然后遍历这个term下的所有terms即可。</p>
+<p>从分析可以看出，FST的这个索引在内存中仅用一个bytes数组，额外加上少量的cachedRootArcs数组空间，即可。是十分节省内存空间的，但是查询时可能比较消耗cpu的计算。</p>
+<h1 id="小结">小结</h1>
+<p>FST的算法十分复杂，描述和理解起来都比较困难，比较容易学习的方法就是看lucene的源码，通过debug的方式，查看关键数据结构中的值，来理解算法原理。笔者从看源码到理解花费了一周左右的时间。有兴趣的同学也可以自己去看看相应的源码。本文是以lucene4.8.0为基础分析的。</p>
+<p>Lucene通过使用FST在内存中存储了term的一份索引，紧凑的数据格式（FST bytes数组），不但减少了内存使用量，还有效的提高了term的检索效率，是一个非常优秀的算法。</p>
+<h1 id="参考资料">参考资料</h1>
+<ul>
+<li><a href="http://blog.mikemccandless.com/2010/12/using-finite-state-transducers-in.html" target="_blank" rel="external">http://blog.mikemccandless.com/2010/12/using-finite-state-transducers-in.html</a> （作者说明）</li>
+<li>Direct Construction of Minimal Acyclic Subsequential Transducers. （算法的论文）</li>
+<li>Applications of Deterministic Finite Automata. （有助于理解）</li>
+<li><a href="http://sbp810050504.blog.51cto.com/2799422/1361551" target="_blank" rel="external">http://sbp810050504.blog.51cto.com/2799422/1361551</a> （中文资料，尽管有些误区）。</li>
+</ul>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="dlfuf0iq9piiw4dv" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="lx4xrnalg9fn0asu" class="article-share-link">Share</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/fst/">fst</a></li></ul>
