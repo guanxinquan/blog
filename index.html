@@ -87,7 +87,7 @@
     <div class="article-entry" itemprop="articleBody">
       
         <h1 id="前言">前言</h1>
-<p>FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行的过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。</p>
+<p>FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。</p>
 <p>在FST构建过程中，term的文本信息(按照字典顺序排序）作为FST的input，term的存储位置（或者次序）作为FST的output，<input,output>二元组将以FST的形式存储在内存中（<strong>请注意input和output都是有序的</strong>）。检索时，根据input，通过计算FST中的路径上的权值信息，获取到output数据，最终在磁盘上定位term的其它附加信息。同时FST还能够快速的判断一个term是否在lucene中。<br>
         
           <p class="article-more-link">
@@ -97,7 +97,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="lx4xrnalg9fn0asu" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="1tastkwvicsyq9dv" class="article-share-link">Share</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/fst/">fst</a></li></ul>
@@ -141,7 +141,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/firstblog/" data-id="b2xmo4vz8q3wj1vl" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/firstblog/" data-id="9gj0n2aphhv1jjj8" class="article-share-link">Share</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/生活/">生活</a></li></ul>

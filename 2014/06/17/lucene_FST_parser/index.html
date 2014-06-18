@@ -6,15 +6,15 @@
   <title>lucene中的FST算法分析 | MR.GUAN</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="description" content="前言
-FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行的过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。
-在FST构">
+FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。
+在FST构建">
 <meta property="og:type" content="article">
 <meta property="og:title" content="lucene中的FST算法分析">
 <meta property="og:url" content="http://guanxinquan.github.io/blog/blog/2014/06/17/lucene_FST_parser/">
 <meta property="og:site_name" content="MR.GUAN">
 <meta property="og:description" content="前言
-FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行的过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。
-在FST构">
+FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。
+在FST构建">
 <meta property="og:image" content="/blog/pic/lucene_fst/final_fst.jpg">
 <meta property="og:image" content="/blog/pic/lucene_fst/mop_input.jpg">
 <meta property="og:image" content="/blog/pic/lucene_fst/month_input.jpg">
@@ -39,8 +39,8 @@ FST（Finite State Transducer，一种有限自动机，或者称为Mealy machin
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="lucene中的FST算法分析">
 <meta name="twitter:description" content="前言
-FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行的过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。
-在FST构">
+FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。
+在FST构建">
   
     <link rel="alternative" href="/atom.xml" title="MR.GUAN" type="application/atom+xml">
   
@@ -112,7 +112,7 @@ FST（Finite State Transducer，一种有限自动机，或者称为Mealy machin
     <div class="article-entry" itemprop="articleBody">
       
         <h1 id="前言">前言</h1>
-<p>FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行的过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。</p>
+<p>FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。</p>
 <p>在FST构建过程中，term的文本信息(按照字典顺序排序）作为FST的input，term的存储位置（或者次序）作为FST的output，<input,output>二元组将以FST的形式存储在内存中（<strong>请注意input和output都是有序的</strong>）。检索时，根据input，通过计算FST中的路径上的权值信息，获取到output数据，最终在磁盘上定位term的其它附加信息。同时FST还能够快速的判断一个term是否在lucene中。<br><a id="more"></a><br>实际上FST相当于term在内存中的一个索引，lucene使用FST能够快速确定系统中是否存在查询的term，如果存在，能够快速定位其信息存放的具体位置。</input,output></p>
 <p>FST与trie tree结构提供相似的功能，但是，在内存中存储更高效。</p>
 <p>举个例子，我们输入FST的数据如下：</p>
@@ -164,7 +164,7 @@ FST（Finite State Transducer，一种有限自动机，或者称为Mealy machin
 <span class="keyword">long</span> outputValues[] = {<span class="number">0</span>,<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">4</span>,<span class="number">5</span>};
 </code></pre><h4 id="输入mop">输入mop</h4>
 <p><img src="/blog/pic/lucene_fst/mop_input.jpg" alt="after mop input"></p>
-<p>输入mop后，m/o/p三个弧线的信息都保存在frontier中（frontier表示尚未存放到FST bytes中的数据）。FSTbytes数据位空。</p>
+<p>输入mop后，m/o/p三个弧线的信息都保存在frontier中（frontier表示尚未存放到FST bytes中的数据）。FSTbytes数据为空。</p>
 <h4 id="输入moth">输入moth</h4>
 <p><img src="/blog/pic/lucene_fst/month_input.jpg" alt="after month input"></p>
 <p>输入moth时，moth与先前的mop有mo两个公共前缀，在freezeTail过程中，将先前弧线p后面的节点（节点3）存储到FST bytes中，由于节点3没有任何出度，因此FSTbytes中的数据仍然是空，而p的下一个节点是FSTbytes中的-1的位置（-1 表示终止）。之后将th添加到frontier中，增加两个弧线t/1和h。</p>
@@ -198,7 +198,7 @@ FST（Finite State Transducer，一种有限自动机，或者称为Mealy machin
 </ol>
 <p><img src="/blog/pic/lucene_fst/37_output.jpg" alt="after 37 output"></p>
 <h5 id="9的出度">9的出度</h5>
-<p>由9的出度得到如下：flag是6，是last¬_arc和target_next，因此7是当前arc的下一个arc，而且当前节点仅有一个出度。</p>
+<p>由9的出度得到如下：flag是6，是last_arc和target_next，因此7是当前arc的下一个arc，而且当前节点仅有一个出度。</p>
 <p><img src="/blog/pic/lucene_fst/9_output.jpg" alt="after 9 output"></p>
 <h5 id="7的出度">7的出度</h5>
 <p>flag是9，表示是一个终点arc，arc的指向结束状态E。并且不是last_arc，因此，5就是其兄弟节点。<br>5 flag是22，has_output,target_next,last_arc，因此1是output，并且是本节点最后的arc，当前arc的下一个arc，是邻接的那一个（就是2那个）。</p>
@@ -217,7 +217,7 @@ FST（Finite State Transducer，一种有限自动机，或者称为Mealy machin
 <h5 id="15的出度">15的出度</h5>
 <p><img src="/blog/pic/lucene_fst/15_output.jpg" alt="after 15 output"></p>
 <h3 id="检索过程">检索过程</h3>
-<p>cachedRootArcs 一个128个元素的arc数组，存储每个ascii字符对应的起始弧线。例如：要检索以a开始的term，cachedRootArcs[97]就是起始弧线。<br>注意，系统内部仅存储以上图S开始的那些弧线，其它弧线都是通过对FST的bytes数组计算获得。<br>因此，在term的查询过程中，首先通过cachedRootArcs获取term首字母对应的弧线（即其在数组中对应的下标位置），之后按照上面提到过的方式转换其它弧度，按照图的查找算法。如果要查找以某个term开始的所有terms，则按照上述方法，先查找到term，然后遍历这个term下的所有terms即可。</p>
+<p>cachedRootArcs 一个128个元素的arc数组，存储每个ascii字符对应的起始弧线。例如：要检索以a开始的term，cachedRootArcs[97]就是起始弧线。<br>注意，系统内部仅存储以S开始的那些弧线，其它弧线都是通过对FST的bytes数组计算获得。<br>因此，在term的查询过程中，首先通过cachedRootArcs获取term首字母对应的弧线（即其在数组中对应的下标位置），之后按照上面提到过的方式转换其它弧度，按照图的查找算法。如果要查找以某个term开始的所有terms，则按照上述方法，先查找到term，然后遍历这个term下的所有terms即可。</p>
 <p>从分析可以看出，FST的这个索引在内存中仅用一个bytes数组，额外加上少量的cachedRootArcs数组空间，即可。是十分节省内存空间的，但是查询时可能比较消耗cpu的计算。</p>
 <h1 id="小结">小结</h1>
 <p>FST的算法十分复杂，描述和理解起来都比较困难，比较容易学习的方法就是看lucene的源码，通过debug的方式，查看关键数据结构中的值，来理解算法原理。笔者从看源码到理解花费了一周左右的时间。有兴趣的同学也可以自己去看看相应的源码。本文是以lucene4.8.0为基础分析的。</p>
@@ -233,7 +233,7 @@ FST（Finite State Transducer，一种有限自动机，或者称为Mealy machin
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="lx4xrnalg9fn0asu" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="1tastkwvicsyq9dv" class="article-share-link">Share</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/fst/">fst</a></li></ul>
