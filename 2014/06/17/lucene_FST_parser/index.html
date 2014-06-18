@@ -126,13 +126,13 @@ FST（Finite State Transducer，一种有限自动机，或者称为Mealy machin
 <h2 id="算法的基本步骤">算法的基本步骤</h2>
 <ol>
 <li>计算公共前缀。对于新输入的NInput（new input），首先要计算其与上次输出的LInput（Lastest input，LInput数据存放在Frontier中）之间的公共前缀prefix，之后调用freezeTail，将Frontier中的LInput的后缀转换到FST bytes数组中（<strong>需要注意，输入的数据（label）是按照字典顺序有序的，因此求公共前缀的时候，只需要和NInput的前一个输入节点对比即可,后缀是指，除了公共前缀和公共前缀直接后继节点外的节点，例如：aaabc和aacae的公共前缀是aa，此时aaabc的后缀是bc</strong>）。</li>
-<li>将后缀部分存储到FST bytes中。在freezeTail过程中，会将LInput的后缀，从后向前的顺序逐个存储到FST bytes中，每个节点的存储步骤如下，<br><br>2.1  node通过Hash算法判断其是否已经在bytes中，进行如下操作：<br><br>2.1.1  HashMap中找不到key对应的value，将新节点添加到FST bytes中（<strong>添加节点，实际是将节点包含的所有arc都写入到FST bytes中，并不是将节点本身写入FST bytes中</strong>）；<br><br>2.1.2  HashMap中找到key对应的value，从FST bytes中转换出preNode，可能出现下面的两种情况：<br>与当前node的值相等，直接返回preNode的存储位置pos相当于尾部节点的合并。<br>如果不相等，那么继续探测，回到步骤a)。<br></li>
+<li>将后缀部分存储到FST bytes中。在freezeTail过程中，会将LInput的后缀，从后向前的顺序逐个存储到FST bytes中，每个节点的存储步骤如下，<br>2.1  node通过Hash算法判断其是否已经在bytes中，进行如下操作：<br>2.1.1  HashMap中找不到key对应的value，将新节点添加到FST bytes中（<strong>添加节点，实际是将节点包含的所有arc都写入到FST bytes中，并不是将节点本身写入FST bytes中</strong>）；<br>2.1.2  HashMap中找到key对应的value，从FST bytes中转换出preNode，可能出现下面的两种情况：<br>与当前node的值相等，直接返回preNode的存储位置pos相当于尾部节点的合并。<br>如果不相等，那么继续探测，回到步骤2.1。</li>
 </ol>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="bg0u37gvag8eoqtp" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="dlfuf0iq9piiw4dv" class="article-share-link">Share</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/fst/">fst</a></li></ul>
