@@ -3,36 +3,27 @@
 <head>
   <meta charset="utf-8">
   
-  <title>MR.GUAN</title>
+  <title>java 虚拟机垃圾回收原理 | MR.GUAN</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="title: java 虚拟机垃圾回收原理date: 2014-07-10 22:37:01
-tag：gc
-Hotspot GC
-垃圾回收的基本概念
+  <meta name="description" content="垃圾回收的基本概念
 垃圾回收器主要负责：
 
 为对象分配内存；
 确保可执行代码能够访问到的对象保留在内存中；
 无法被可执行代码访问到的对象占用的空间得到释放。">
 <meta property="og:type" content="article">
-<meta property="og:title" content="MR.GUAN">
+<meta property="og:title" content="java 虚拟机垃圾回收原理">
 <meta property="og:url" content="http://guanxinquan.github.io/blog/blog/2014/07/10/gc/">
 <meta property="og:site_name" content="MR.GUAN">
-<meta property="og:description" content="title: java 虚拟机垃圾回收原理date: 2014-07-10 22:37:01
-tag：gc
-Hotspot GC
-垃圾回收的基本概念
+<meta property="og:description" content="垃圾回收的基本概念
 垃圾回收器主要负责：
 
 为对象分配内存；
 确保可执行代码能够访问到的对象保留在内存中；
 无法被可执行代码访问到的对象占用的空间得到释放。">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="MR.GUAN">
-<meta name="twitter:description" content="title: java 虚拟机垃圾回收原理date: 2014-07-10 22:37:01
-tag：gc
-Hotspot GC
-垃圾回收的基本概念
+<meta name="twitter:title" content="java 虚拟机垃圾回收原理">
+<meta name="twitter:description" content="垃圾回收的基本概念
 垃圾回收器主要负责：
 
 为对象分配内存；
@@ -85,19 +76,30 @@ Hotspot GC
         <section id="main"><article id="post-gc" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/blog/2014/07/10/gc/" class="article-date">
-  <time datetime="2014-07-10T13:11:03.000Z" itemprop="datePublished">Jul 10 2014</time>
+  <time datetime="2014-07-10T14:37:01.000Z" itemprop="datePublished">Jul 10 2014</time>
 </a>
     
+  <div class="article-category">
+    <a class="article-category-link" href="/blog/categories/算法/">算法</a>
+  </div>
+
   </div>
   <div class="article-inner">
     
     
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      java 虚拟机垃圾回收原理
+    </h1>
+  
+
+      </header>
+    
     <div class="article-entry" itemprop="articleBody">
       
-        <p>title: java 虚拟机垃圾回收原理<br>date: 2014-07-10 22:37:01</p>
-<h2 id="tag：gc">tag：gc</h2>
-<h1 id="Hotspot_GC">Hotspot GC</h1>
-<h1 id="垃圾回收的基本概念">垃圾回收的基本概念</h1>
+        <h1 id="垃圾回收的基本概念">垃圾回收的基本概念</h1>
 <p>垃圾回收器主要负责：</p>
 <ol>
 <li>为对象分配内存；</li>
@@ -139,11 +141,13 @@ CMS适用于对暂停时间有要求的，并且在垃圾回收过程中，能�
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="5wtqwf4o58f8cicp" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="t3v8rvmea56v7wt8" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/07/10/gc/#disqus_thread" class="article-comment-link">Comments</a>
       
       
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/fst/">fst</a></li></ul>
+
     </footer>
   </div>
   
@@ -175,7 +179,7 @@ CMS适用于对暂停时间有要求的，并且在垃圾回收过程中，能�
   <div class="widget-wrap">
     <h3 class="widget-title">Categories</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/blog/categories/算法/">算法</a><span class="category-list-count">1</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/blog/categories/算法/">算法</a><span class="category-list-count">2</span></li></ul>
     </div>
   </div>
 
@@ -184,7 +188,7 @@ CMS适用于对暂停时间有要求的，并且在垃圾回收过程中，能�
   <div class="widget-wrap">
     <h3 class="widget-title">Tags</h3>
     <div class="widget">
-      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/fst/">fst</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/生活/">生活</a><span class="tag-list-count">1</span></li></ul>
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/fst/">fst</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/生活/">生活</a><span class="tag-list-count">1</span></li></ul>
     </div>
   </div>
 
@@ -193,7 +197,7 @@ CMS适用于对暂停时间有要求的，并且在垃圾回收过程中，能�
   <div class="widget-wrap">
     <h3 class="widget-title">Tag Cloud</h3>
     <div class="widget tagcloud">
-      <a href="/blog/tags/fst/" style="font-size: NaNpx;">fst</a><a href="/blog/tags/生活/" style="font-size: NaNpx;">生活</a>
+      <a href="/blog/tags/fst/" style="font-size: 20.00px;">fst</a><a href="/blog/tags/生活/" style="font-size: 10.00px;">生活</a>
     </div>
   </div>
 
@@ -214,7 +218,7 @@ CMS适用于对暂停时间有要求的，并且在垃圾回收过程中，能�
       <ul>
         
           <li>
-            <a href="/blog/2014/07/10/gc/">(no title)</a>
+            <a href="/blog/2014/07/10/gc/">java 虚拟机垃圾回收原理</a>
           </li>
         
           <li>
