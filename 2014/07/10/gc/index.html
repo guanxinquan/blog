@@ -133,13 +133,19 @@ Parallel Compacting Collector出现在j2se5.0 update 6. Parallel Compacting Coll
 与Parallel Collector年轻代回收算法相同。<h3 id="Parallel_Compacting_Collector_老年代回收算法">Parallel Compacting Collector 老年代回收算法</h3>
 Parallel Compacting Collector老年代和持久代回收算法具有stop-the-world、垃圾回收过程并行和滑动压缩（sliding compaction）等特征。回收过程分为三个阶段：<br><br>第一阶段，每个年龄代分成固定大小的区域（regions）。在标记过程中，那些能够直接通过应用程序代码访问到的存活的Object划分给多个垃圾回收线程，这些线程并行的标记其它存活的对象。每当线程发现一个存活的对象，就会更新对象所在区域信息，记录这个对象所在位置和占用空间大小。<br><br>总结（summary）阶段是基于regions而不是对象。由于先前多次的压缩，因此留在每个年龄代左侧的部分数据的密度相对较大，包含了更多的存活的对象。对存活密度较大的区域进行压缩的消耗较大，并且不能释放多少有用的空间。所以，在summary阶段，首要的任务是确定每个区域的对象密度，从年龄代的最左侧开始，直到找到某个以区域满足其压缩释放的空间与压缩拷贝的代价相比更客观。从这一点开始，向左侧的区域被称为dense prefix，并且任何在dense prefix中的对象，在垃圾回收期间都不会移动。从这个点开始，向右侧的所有区域都将被压缩。需要注意的是，summary过程当前还是串行执行的；summary也可以并行执行，但是，即使是并行执行也不能提高多少效率。<br><br>在压缩过程中，回收线程使用summary过程中记录的数据确定哪些regions需要被填充，并且各个线程能够独立的将数据拷贝到对应的区域中。回收结束后，heap区一端是对象密度较大的区域，而另外一端是一个连续未被占用的空间。<h3 id="使用Parallel_Compacting_Collector的时机">使用Parallel Compacting Collector的时机</h3>
 与Parallel Collector相似，Parallel Compacting Collector适合应用于多CPU的服务器上，由于老年代的并行回收，缩短了暂停时间（pause time），因此更适合用于对暂停时间有严格要求的应用。可以通过配置-XX:ParallelGCThreads=n的方式配置回收过程中，回收器使用的线程数目。<h3 id="使用Parallel_compaction_Collector">使用Parallel compaction Collector</h3>
-可以通过指定命令行参数-XX:+UseParllelOldGC的方式显示指定使用Parallel Compaction Collector。</li>
+可以通过指定命令行参数-XX:+UseParllelOldGC的方式显示指定使用Parallel Compaction Collector。<h2 id="Concurrent_Mark-Sweep(CMS)Collector">Concurrent Mark-Sweep(CMS)Collector</h2>
+年轻代回收暂停的时间一般都很短暂，对于回收频率较低的老年代，可能需要较长时间的暂停，尤其是heap空间比较大的情况。有些应用相对于吞吐量来说，相应时间显得更重要，因此，HotSpot JVM提供了concurrent mark-sweep（CMS）回收器，或者称为低延时（low-latency）回收器。<h3 id="年轻代使用Parallel_Collector">年轻代使用Parallel Collector</h3>
+CMS回收器年轻代使用Parallel相同的垃圾回收算法。<h3 id="老年代使用CMS算法">老年代使用CMS算法</h3>
+CMS回收过程中，大多数时间都是与应用程序并行执行的。<br><br>CMS回收过程以一个短暂的暂停开始（称为initial mark），这个过程标注那些能够直接被应用程序直接访问到的初始对象集合。之后回收器并行标记那些通过初始对象集合能够访问到的其它对象。由于在并行标记过程中，应用程序并行运行，可能会更新对象的引用，为了解决这个问题，应用程序重新暂停，回收器重新访问那些在并行标记期间被更新的对象，重新标记他们，这个过程称为remark phase。remark phase可以是多个线程并行标记，因此与initial mark更高效。<br><br>remark phase结束后，heap中的所有存活的对象都已经被标记，接下来的并行清理过程（concurrent sweep phase)将会释放所有垃圾对象占用的空间。<br><br>由于CMS回收过程有一些操作，例如在remark过程中重新访问对象，增加了回收器的工作量，垃圾回收的代价也增加。因此，这也是那些希望缩短暂停时间的回收器需要权衡的问题。<br><br>CMS是唯一不压缩的垃圾回收器，也就是说，CMS垃圾回收结束后，并没有将对象移动到老年代的一端。<br><br>CMS舍去了压缩过程从而减少了垃圾回收过程的时间，但是不连续的内存空间，不能够使用单一指针形式分配内存，而是需要一些empty free列表记录可用空间。CMS维护一组empty list，将没有被占用的零散的内存空间链接起来，需要分配内存时，回收器查找到一个适当的list（依赖要分配的空间大小），这个list查找到一个足够大的内存空间分配给对象。CMS老年代中分配空间与bump-the-pointer模式相比代价要高很多，也正因此，CMS年轻代的回收时间也受到影响（因为大多数老年代中对象的分配是由于年轻代回收过程中对象晋级造成的）。<br><br>CMS垃圾回收第一次标注过程中，应用程序仍然可以在堆空间分配对象，老年代的空间占用仍然可以增长，因此，CMS垃圾回收与其他的回收算法相比需要更多的内存空间。尽管回收器能够保证所有存活对象能够正确保留下来，但是有一些对象在回收过程中变成垃圾，这些垃圾对象在下次垃圾回收前都不会被释放，他们成为漂浮垃圾（floating garbage）。<br><br>由于没有压缩，CMS回收后可能存在垃圾碎片，为了应对碎片，CMS跟踪对象分配的平均大小，预测对象需求的空间，并且合并或者拆分空闲空间满足需求。<br><br>与其他的垃圾回收算法不同，CMS并不是等到老年代空间已经满了才开始垃圾回收，而是，尝试在老年代空间耗尽之前完成垃圾回收。否则，CMS会回复到串行或者并行的垃圾回收算法，为了避免这种降级，CMS统计先前垃圾回收的时间间隔，预测下次回收的时间，并在预测时间到来时回收垃圾。CMS垃圾回收也可能在老年代空间占用比率超过设定值时启动。可以通过命令行参数-XX:CMSInitiationOccupancyFraction=n来设置，其中n表示占用比率，默认是68.<br><br>简单说，与并行回收相比，CMS降低了老年代回收的暂停时长（有时会很显著），代价是年轻代回收暂停时间略微变长、吞吐量可能会降低、需要更多的heap空间。<br><h3 id="incremental_model">incremental model</h3>
+CMS的并行过程（concurrent phases）可以使用渐增（incrementally）方式执行。渐增方式通过周期性暂停并行过程，以便将处理器让出来给应用程序使用从而减轻并行回收过程长时间占用处理进程。并行过程回收任务被划分成多个小块时间任务，在年轻代回收过程中触发任务的执行。这种模式适用于运行于少量处理器（例如1或者2）并且对暂停时间有严格要求的应用中。<h3 id="适用CMS的时机">适用CMS的时机</h3>
+CMS适用于对暂停时间有要求的，并且在垃圾回收过程中，能够和并行应用程序共享处理进程的应用（由于CMS回收过程中，会占用应用程序的cpu周期）。一般来说，老年代中有大量存活的对象并且运行在多核处理器上的应用程序，适用于CMS，最常见的例子如web 服务器。如果应用程序有暂停时间的限制，可以考虑使用CMS。CMS同样适用于老年代大小适当的单核处理器交互式应用程序。<h3 id="使用CMS">使用CMS</h3>
+可以通过配置命令行参数-XX:UseConcMarkSweepGC参数来显示使用CMS。通过配置-XX:+CMSIncrementalMode来显示使用渐增式CMS。</li>
 </ol>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="pk0j78290orkei15" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="08jbfsbwbfjfzl4q" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/07/10/gc/#disqus_thread" class="article-comment-link">Comments</a>
       
