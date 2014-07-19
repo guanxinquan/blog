@@ -166,11 +166,38 @@ CMS适用于对暂停时间有要求的，并且在垃圾回收过程中，能�
 <p>并行垃圾回收器先尝试满足期望最大暂停时间，只有期望时间满足后才尝试满足吞吐目标，同理，仅在上述两个目标都满足的情况下，才尝试满足内存目标。</p>
 <h1 id="建议">建议</h1>
 <p>正如前面提到的，jvm能够根据环境自动选择垃圾回收算法、虚拟机启动的类型、heap配置，对大多数应用来说这些已经足够了。对垃圾回收器配置的最初建议为什么都不做，让系统根据应用运行的操作系统和硬件环境自动选择！之后测试应用程序，如果他具有较高的吞吐率和较低的暂停时间，那么，根本不用配置任何垃圾回收选项。<br><br>另一方面，如果应用程序因为垃圾回收纯在性能问题，首先综合系统和应用的特点，判断默认的垃圾回收方式是否纯在问题，如果纯在问题，选着适合的回收算法，查看性能是否满足需求。<br><br>可以使用一些工具来测试应用程序的性能，基于测试结果，可以对垃圾回收相关的选项进行调节，例如那些控制heap大小和回收行为的参数。需要注意：最好的gc调优方法为，先衡量（Measure）后调整。不要过度调优，由于应用程序的数据、硬件环境包括虚拟机算法都可能随着时间变化。</p>
+<h1 id="OutOfMemoryError">OutOfMemoryError</h1>
+<p>java.lang.OutOfMemmoryError是一个常见的导致应用程序自动退出的异常，当回收器没有足够的空间分配新的对象时，抛出这个异常。OutOfMemoryError并不意味着一定是应用程序内存泄露，也可能是由于回收器配置原因，例如，被指定的（或者默认分配的）堆区大小并不能满足应用程序的实际需求。<br>分析OutOfMemmoryError产生的原因时，要注意回收器提供的额外信息，下面列举了附加信息和对应可能导致OutOfMemmoryError的原因：</p>
+<ul>
+<li>Java heap space 。这个提示表明，回收器没有足够的空间分配新的对象，多数情况下，是由于通过显示指定-Xmx或者默认选取的堆最大空间不能满足应用程序的实际需求引起的。也可能是由于，应用程序持有大量的无用对象，这些对象不能够被垃圾回收器直接回收，可以使用HAT分析所有存活对象和对象之间引用关系。此外，如果应用程序中大量使用finalizers，导致大量线程调用finalizers，这些线程排队等待处理的速度如果跟不上finalizers需求产生的速度，回收器也会抛出OutOfMemmoryError异常，可以使用jconsole分析器监控等待执行finalization的对象数量。</li>
+<li>PermGen space 。 回收器使用Perm区存储JMV的元数据，如果应用程序加载大量的classes，很可能导致Perm区消耗殆尽，可以使用-XX:MaxPermSize=n的方式指定Perm区大小。</li>
+<li>Requested array size exceeds VM limit 。 如果应用程序试图分配一个数组的空间大于heap区的大小，将会抛出此异常。</li>
+</ul>
+<h1 id="gc的常用工具">gc的常用工具</h1>
+<h3 id="-XX:+PrintGCDetails">-XX:+PrintGCDetails</h3>
+<p>配置JVM启动选项-XX:+PrintGCDetails，回收器在每次垃圾回收后会打印回收信息，例如回收前后不同代间的存活对象的数量，每个年龄代可用内存空间，以及本次垃圾回收所用的时间。</p>
+<h3 id="-XX:PrintGCTimeStamps">-XX:PrintGCTimeStamps</h3>
+<p>这个配置选项是配合-XX:+PrintGCDetails选项一起使用的，能够额外打印出每次gc开始的时间。</p>
+<h3 id="jmap">jmap</h3>
+<p>jmap是基于Solaris或Linux系统JDK附带分析工具，能够打印出内存使用相关的统计和核心文件信息。<br><br>-heap选项，获取垃圾回收器的名字信息、算法参数详情（例如，并行垃圾回收器使用的并行回收线程的数目），heap区配和使用信息。<br><br>-histo选项，获取heap中的对象类信息。对于每个class，打印出heap中对应对象的数目，这些对象在内存中占用的空间和完整的类名信息，有助于分析内存是如何被使用的。<br><br>-permstat选项，某些需要加载大量类或者动态生成代码的应用程序（例如 Web服务器），指定一个适当的perm区大小显得很重要。如果应用程序加载了太多的类，JVM就会抛出OutOfMemmoryError异常。-permstat选项能够获得perm区对象统计信息，帮助诊断错误。</p>
+<h3 id="jstat">jstat</h3>
+<p>jstat工具使用HotSpot JVM的内部指令获取运行时应用程序的性能和资源消耗信息。有很多可用选项能够打印出垃圾回收器统计信息、各年龄代的容量和占用信息。</p>
+<h1 id="垃圾回收的关键选项">垃圾回收的关键选项</h1>
+<h2 id="垃圾回收器的选择">垃圾回收器的选择</h2>
+<p>-XX:+UseSerialGC<br><br>-XX:+UseParallelGC<br><br>-XX:+UseParllelOldGC<br><br>-XX:+UseConcMarkSweepGC</p>
+<h2 id="统计相关配置选项">统计相关配置选项</h2>
+<p>-XX:+PrintGC<br><br>-XX:+PrintGCDetails<br><br>-XX:PrintGCTimeStamps</p>
+<h2 id="Heap和年龄代大小选项">Heap和年龄代大小选项</h2>
+<p>-Xmsn<br><br>-Xmxn<br><br>-XX:NewSize=n (默认初始年轻代空间大小bytes）<br><br>-XX:NewRatio=n (年轻代和老年代占用的空间比值，例如n=3，那么年轻代（包括Eden和两个Surivivor）占用的空间将是年轻代加上老年代占用空间的1/4,默认client JVM n=2，Server JVM n=8）<br><br>-XX:SurvivorRatio=n(Surivivor区与Eden区占用的空间比值，例如n=7，那么每个Survivor占用的空间将是年轻代的1/9，默认n=32)<br><br>-XX:MaxPermSize=n</p>
+<h3 id="并行垃圾回收参数">并行垃圾回收参数</h3>
+<p>-XX:ParallelGCThreads=n (垃圾回收的线程数，默认为cpu的内核数）<br><br>-XX:MaxGCPauseMillis=n （垃圾回收器期望的暂停时间（毫秒），无默认值）。<br><br>-XX:GCTimeRatio=n (1/(1+n)的时间将被用于垃圾回收，默认为99）。</p>
+<h3 id="CMS参数">CMS参数</h3>
+<p>-XX:+CMSIncrementalModel<br><br>-XX:+CMSIncrementalPacing<br><br>-XX:ParallelGCThreads=n<br></p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="xmt9l8vq819ll64u" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="bwkcdeunh0wnteil" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/07/10/gc/#disqus_thread" class="article-comment-link">Comments</a>
       
