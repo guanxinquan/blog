@@ -21,6 +21,11 @@
 为对象分配内存；
 确保可执行代码能够访问到的对象保留在内存中；
 无法被可执行代码访问到的对象占用的空间得到释放。">
+<meta property="og:image" content="/blog/pic/gc/generational_garbage_collection.png">
+<meta property="og:image" content="/blog/pic/gc/serial_gc.png">
+<meta property="og:image" content="/blog/pic/gc/after_serial_gc.png">
+<meta property="og:image" content="/blog/pic/gc/old_serial_gc.png">
+<meta property="og:image" content="/blog/pic/gc/parallel_collector.png">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="java 虚拟机垃圾回收原理">
 <meta name="twitter:description" content="垃圾回收的基本概念
@@ -115,41 +120,41 @@ generational回收将内存分成多个generations，每个generation都是一�
 <li>大多数对象不会存活较长时间，他们在年轻代就死亡了；</li>
 <li>少量年轻对象能够在老年代出现。</li>
 </ul>
-<p>年轻代垃圾回收相对要更频繁、更有效、更快速，因为年轻代的存储空间较小，并且存放的多数都是短期对象。<br><br>那些经历过预定次数年轻代垃圾回收的对象将会被晋级到老年代中。老年代的存储空间一般要远大于年轻代，并且，存储对象占用的空间增长缓慢，因此，老年代垃圾回收频率很低，并且消耗更长时间。<br><br>由于年轻代垃圾回收比较频繁，因此选择回收算法更关注于回收速度，另一方面，老年代占用了heap区域的大部分空间，并且要在较低的垃圾密度下更好的工作，因此更关注空间效率。</p>
+<p><img src="/blog/pic/gc/generational_garbage_collection.png" alt="generation Collection"><br>年轻代垃圾回收相对要更频繁、更有效、更快速，因为年轻代的存储空间较小，并且存放的多数都是短期对象。<br><br>那些经历过预定次数年轻代垃圾回收的对象将会被晋级到老年代中。老年代的存储空间一般要远大于年轻代，并且，存储对象占用的空间增长缓慢，因此，老年代垃圾回收频率很低，并且消耗更长时间。<br><br>由于年轻代垃圾回收比较频繁，因此选择回收算法更关注于回收速度，另一方面，老年代占用了heap区域的大部分空间，并且要在较低的垃圾密度下更好的工作，因此更关注空间效率。</p>
 <h1 id="java_HotSpot_JVM_GC">java HotSpot JVM GC</h1>
 <h2 id="HotSpot_按代回收">HotSpot 按代回收</h2>
-<p>HotSpot JVM的内存被分为三代，分别是年轻代，老年代和永久（permanent）代，大多数Objects在年轻代中初始化。老年代中存放着经历了指定次数年轻代垃圾回收后仍然存活的对象，以及一些占用空间比较大的对象，他们很可能直接创建在老年代中。持久区存放一些方便JVM查找垃圾回收管理的对象信息，例如classes或者methods的描述对象和classes和methods本身。<br><br>年轻代由一个伊甸园（Eden）区和两个存活（survivor）区组成，大多数对象都在Eden区初始化。（有一部分比较大的对象，很可能直接分配在老年代中）。survivor区存放至少经历一次年轻代垃圾回收仍然存活的对象，并且还存在一定几率在晋升到old区之前无效的对象。在任何一个时间内，仅有一个survivor区保存存活对象，另外一个一直是空的，直到下次垃圾回收。</p>
+<p>HotSpot JVM heap区分为三代，分别是年轻代，老年代和永久（permanent）代，大多数对象在年轻代中初始化。老年代中存放着经历了指定次数年轻代垃圾回收后仍然存活的对象和一些占用较大存储空间的对象（他们很可能直接在老年代中初始化）。持久区存放JVM垃圾回收管理需要的对象信息，例如classes或者methods的描述对象和classes和methods本身。<br><br>年轻代由一个伊甸园（Eden）区和两个存活（survivor）区组成，大多数对象都在Eden区初始化。（有一部分比较大的对象，很可能直接分配在老年代中）。survivor区存放至少经历一次年轻代垃圾回收仍然存活尚未达到晋级老年代资格的对象。在应用程序运行期间，仅有一个survivor区保存对象，另外一个一直是空的，直到下次垃圾回收。</p>
 <h2 id="垃圾回收类型">垃圾回收类型</h2>
-<p>年轻代空间耗尽后，年轻代垃圾回收就会执行。当老年代或者永久代耗尽，full collection就会执行。在full gc的过程中，所有年龄代都会被回收，一般来讲，由于年轻代能够最高效的定位哪些是垃圾，因此最先执行，之后是老年代的垃圾回收算法会在老年代和永久代执行。如果，垃圾回收还需要compacting，那么不同的代间分别执行compacted。<br><br>有时，老年代太满了，已经无法继续分配年轻代晋级过来的对象，此时，年轻代垃圾回收将不会执行，而是将在整个heap区域执行老年代垃圾回收算法（CMS算法除外，因为CMS老年代算法无法回收年轻代的空间）。</p>
+<p>年轻代空间耗尽后，年轻代垃圾回收（minor collection）就会执行，老年代或者永久代耗尽，full collection（major collection）就会执行。full gc过程中，所有年龄代都会被回收，年轻代能够高效的定位垃圾，因此最先执行，之后老年代和永久代执行垃圾回收。如果，垃圾回收还需要compacting，那么不同的代间分别执行compacted。<br><br>有时，老年代太满了，已经无法为年轻代晋级的对象分配空间，此时，年轻代垃圾回收将不会执行，而是将在整个heap区域执行老年代垃圾回收算法（CMS算法除外，因为CMS老年代算法无法回收年轻代的空间）。</p>
 <h2 id="快速分配">快速分配</h2>
-<p>在很多情况下，内存中会有大量的连续的空间用于分配对象，此时，使用偏移指针（bump-the-pointer）分配对象会很高效。指针只需要跟踪先前最后一个对象分配位置的结尾处，当有新的对象分配请求到来时，仅需要验证当前代中剩余的空间是否能够容纳新对象，如果能够承载，仅需要更新指针并初始化对象即可。<br><br>对于多线程应用，分配过程需要保证线程安全。如果使用锁控制，在代中分配空间将会变成瓶颈，并且影响性能。HotSpot使用Thread-Local Allocation Buffers（TLABs）算法，通过使每个现成拥有自己的buffer（代中的一小块区间），提高了并行程序分配内存的吞吐率。由于每个TLAB块仅有一个线程可以访问，因此，通过bump-the-pointer技术能够快速分配内存。例如：管理TLABs平均要消耗1%的Eden，结合使用线性分配（bump-the-pointer）每次的内存分配仅需要大概10个本地指令就能完成。</p>
+<p>多数情况，内存有大量连续空间用于对象分配，此时，使用偏移指针（bump-the-pointer）分配对象会很高效。指针记录先前最后一个对象分配的位置，需要分配新对象时，仅需验证当前代中剩余空间是否能容纳新对象，如果能，仅需要更新指针并初始化对象即可。<br><br>多线程应用对象分配过程需要保证线程安全，如果使用锁控制，分配空间将会变成瓶颈，严重影响应用程序性能。HotSpot使用Thread-Local Allocation Buffers（TLABs）算法，每个线程拥有自己的buffer（代中的一小块区间），提高了并行程序分配内存的吞吐率。由于每个TLAB块仅有一个线程可以访问，因此，通过内部使用bump-the-pointer技术能够快速分配内存。例如：管理TLABs平均要消耗1%的Eden，结合使用线性分配（bump-the-pointer）每次的内存分配仅需要大概10个本地指令就能完成。</p>
 <h2 id="Serial_Collector">Serial Collector</h2>
-<p>Serial collector，年轻代或者老年代回收都是stop-the-world方式串行执行（仅用一个cpu），即是说，在垃圾回收期间，整个应用程序都是暂停的。</p>
+<p>Serial collector，年轻代或者老年代回收都是stop-the-world方式串行执行（仅用一个处理器），即是说，在垃圾回收期间，整个应用程序都是暂停的。</p>
 <h3 id="年轻代的串行回收">年轻代的串行回收</h3>
-<p>下图描述了使用串行化的年轻代回收方式。在Eden中存活的对象被拷贝到空的survivor区域中（图中to标记的区域），那些很大的对象有可能直接拷贝到老年代中。在非空的survivor区域中存活的并且被认为依然很年轻的对象（图中from）也会被拷贝到另一个survivor中，那些被认为应该晋升为老年区的对象将会被直接拷贝到老年代中。<strong>如果To区域已经满了，那面Eden区或者From survivor区剩余的对象将会直接拷贝到老年代，无论对象已经经历了多少次的年轻代gc</strong><br><br>年轻代回收结束后，Eden区域和先前的survivor区域都变成空的，只有先前空的survivor空间保留存活的对象，survivor空间将会调换角色。</p>
+<p>下图描述了串行年轻代回收过程。Eden区存活的对象被拷贝到空的survivor区域中（图中to标记的区域），很大的对象可能直接拷贝到老年代中。非空的survivor区域中（图中from标记的区域）存活尚不满足晋级老年代的对象也会被拷贝到另一个survivor中，满足晋级老年区的对象直接拷贝到老年代中。<strong>如果To区域已经满了，那面Eden区或者From survivor区剩余对象将直接拷贝到老年代，无论对象是否满足晋级条件</strong><br><br><img src="/blog/pic/gc/serial_gc.png" alt="Serial Young Collection"><br>年轻代回收结束后，Eden区域和先前非空survivor区域都变成空的，先前空的survivor空间保留存活对象，survivor空间将会调换角色，如下图。<br><img src="/blog/pic/gc/after_serial_gc.png" alt="After Serial Young Collection"></p>
 <h3 id="老年代串行回收">老年代串行回收</h3>
-<p>串行老年代回收过程中，老年代和持久代使用mark-sweep-compact算法，在mark阶段，收集器确定哪些对象依然存活，在sweep阶段，定义垃圾对象，之后，收集器使用滑动压缩，将存活的object都向老年代起始位置滑动（持久代同理），将连续的空闲的空间留在代的末尾。compacting使得在老年代或者持久代中能够使用bump-the-pointer技术快速分配对象。</p>
-<h3 id="使用窜行收集器的时机">使用窜行收集器的时机</h3>
-<p>串行收集器可以在多数客户端应用上或者对短暂停（stop-the-world的时间）要求不敏感的需求。</p>
-<h3 id="使用串行收集器">使用串行收集器</h3>
+<p>老年代（和持久代）串行回收使用mark-sweep-compact算法，在mark阶段，收集器标记存活对象，在sweep阶段，收集器使用滑动压缩，将存活的对象向老年代起始位置滑动（持久代同理），将连续的空闲的空间留在代的末端。compacting能够保证老年代或者持久代中能够使用bump-the-pointer技术快速分配对象。<br><img src="/blog/pic/gc/old_serial_gc.png" alt="Serial Old Collection"></p>
+<h3 id="Serial_Collector使用时机">Serial Collector使用时机</h3>
+<p>串行收集器可以在多数客户端应用上或者对暂停时间（stop-the-world的时间）要求不敏感的应用中使用。</p>
+<h3 id="使用Serial_Collector">使用Serial Collector</h3>
 <p>在java5.0版本中，对于非server-class机器，串行收集器是默认的选择，在其他机器上，可以通过-XX:+UseSerialGC命令显示指定使用串行收集器。</p>
 <h2 id="Parallel_Collector">Parallel Collector</h2>
 <h3 id="年轻代的回收">年轻代的回收</h3>
-<p>Parallel Collector使用Serial Collector的回收算法，但却是并行的版本。Parallel Collector也是stop-the-world和coping回收器，但是他能够利用多cpu并发处理年轻代的垃圾回收，降低了垃圾回收的成本，提高了应用程序的吞吐率。</p>
+<p>Parallel Collector使用Serial Collector的回收算法，但却是并行的版本。Parallel Collector也是stop-the-world和coping回收器，但是他能够利用多cpu并发处理年轻代垃圾回收，降低垃圾回收成本，提高应用程序吞吐率。<br><img src="/blog/pic/gc/parallel_collector.png" alt="Parallel Collector"></p>
 <h3 id="老年代的回收">老年代的回收</h3>
-<p>老年代的回收使用与Serial Collector一样的算法，既mark-sweep-compact垃圾回收算法。</p>
+<p>老年代回收使用与Serial Collector一样的算法，既mark-sweep-compact垃圾回收算法。</p>
 <h3 id="Parallel_Collector使用时机">Parallel Collector使用时机</h3>
-<p>由于Parallel Collector存在频率较低，潜在stop-the-world时间较长的老年代回收，因此，他适用于执行在多cpu机器上并且没有严格的暂停时间长度的限制应用程序。例如，批处理程序、账单程序、科学计算等。</p>
-<h3 id="使用Parallel_Collector垃圾收集器">使用Parallel Collector垃圾收集器</h3>
-<p>Parallel Collector是jase5.0默认的服务（server-class）机器配置垃圾收集器。在其他的情况下，可以通过显示配置-XX:+UseParallelGC命令配置并行垃圾收集。</p>
+<p>由于Parallel Collector存在频率较低，潜在stop-the-world时间较长的老年代回收，因此，他适用于执行在多cpu机器上并且没有严格的暂停时间限制应用程序。例如，批处理程序、账单程序、科学计算等。</p>
+<h3 id="使用Parallel_Collector">使用Parallel Collector</h3>
+<p>Parallel Collector是jase5.0默认的服务（server-class）机器配置垃圾收集器。在其他的情况下，可以通过显示配置-XX:+UseParallelGC命令配置Parallel Collector。</p>
 <h2 id="Parallel_Compacting_Collector">Parallel Compacting Collector</h2>
-<p>Parallel Compacting Collector出现在j2se5.0 update 6. Parallel Compacting Collector与Parallel Collector的区别在于，老年代回收算法的不同。需要注意的是，Parallel Compacting Collector会作为Parallel Collector的替代品存在。</p>
+<p>Parallel Compacting Collector出现在j2se5.0 update 6. Parallel Compacting Collector与Parallel Collector的区别在于，老年代回收算法。需要注意的是，Parallel Compacting Collector会作为Parallel Collector的替代品存在。</p>
 <h3 id="Parallel_Compacting_Collector_年轻代收集算法">Parallel Compacting Collector 年轻代收集算法</h3>
 <p>与Parallel Collector年轻代回收算法相同。</p>
 <h3 id="Parallel_Compacting_Collector_老年代回收算法">Parallel Compacting Collector 老年代回收算法</h3>
-<p>Parallel Compacting Collector老年代和持久代回收算法具有stop-the-world、垃圾回收过程并行和滑动压缩（sliding compaction）等特征。回收过程分为三个阶段：<br><br>第一阶段，每个年龄代分成固定大小的区域（regions）。在标记过程中，那些能够直接通过应用程序代码访问到的存活的Object划分给多个垃圾回收线程，这些线程并行的标记其它存活的对象。每当线程发现一个存活的对象，就会更新对象所在区域信息，记录这个对象所在位置和占用空间大小。<br><br>总结（summary）阶段是基于regions而不是对象。由于先前多次的压缩，因此留在每个年龄代左侧的部分数据的密度相对较大，包含了更多的存活的对象。对存活密度较大的区域进行压缩的消耗较大，并且不能释放多少有用的空间。所以，在summary阶段，首要的任务是确定每个区域的对象密度，从年龄代的最左侧开始，直到找到某个以区域满足其压缩释放的空间与压缩拷贝的代价相比更客观。从这一点开始，向左侧的区域被称为dense prefix，并且任何在dense prefix中的对象，在垃圾回收期间都不会移动。从这个点开始，向右侧的所有区域都将被压缩。需要注意的是，summary过程当前还是串行执行的；summary也可以并行执行，但是，即使是并行执行也不能提高多少效率。<br><br>在压缩过程中，回收线程使用summary过程中记录的数据确定哪些regions需要被填充，并且各个线程能够独立的将数据拷贝到对应的区域中。回收结束后，heap区一端是对象密度较大的区域，而另外一端是一个连续未被占用的空间。</p>
+<p>Parallel Compacting Collector回收算法具有stop-the-world、并行回收和滑动压缩（sliding compaction）等特征。回收过程分为三个阶段：<br><br>第一阶段标记（mark）：标记过程，老年代（或者持久代）分成固定大小的区域（regions），能够直接通过应用程序代码访问到的存活对象划分给多个垃圾回收线程，这些线程并行标记其它存活对象。每当线程发现一个存活的对象，就会更新对象所在区域信息，记录这个对象所在位置和占用空间大小。<br><br>第二阶段总结（summary）：summary阶段是基于regions而不是对象。由于先前多次的压缩，因此留在每个年龄代左侧部分数据的密度相对较大，包含了更多存活的对象。对存活密度较大区域进行压缩的消耗较大，并且不能释放多少有用的空间。所以，在summary阶段，首要任务是确定每个区域的对象密度，从年龄代最左侧开始，直到找到某个区域满足其压缩释放空间与压缩拷贝代价相比更有价值。从这一点开始，向左的区域被称为dense prefix，并且任何在dense prefix中的对象，在垃圾回收期间都不会移动。从这个点开始，向右的所有区域都将被压缩。需要注意的是，summary过程当前还是串行执行的；summary也可以并行执行，但是，即使是并行执行也不能提高多少效率。<br><br>在压缩过程中，回收线程使用summary过程中记录的数据确定哪些regions需要被填充，并且各个线程能够独立的将数据拷贝到对应的区域中。回收结束后，heap区一端是对象密度较大的区域，而另外一端是一个连续未被占用的空间。</p>
 <h3 id="使用Parallel_Compacting_Collector的时机">使用Parallel Compacting Collector的时机</h3>
-<p>与Parallel Collector相似，Parallel Compacting Collector适合应用于多CPU的服务器上，由于老年代的并行回收，缩短了暂停时间（pause time），因此更适合用于对暂停时间有严格要求的应用。可以通过配置-XX:ParallelGCThreads=n的方式配置回收过程中，回收器使用的线程数目。</p>
+<p>与Parallel Collector相似，Parallel Compacting Collector适合应用于多CPU的服务器上，由于老年代的并行回收，缩短了暂停时间（pause time），因此更适合用于对暂停时间有严格要求的应用。可以通过配置-XX:ParallelGCThreads=n的方式配置回收器使用的线程数目。</p>
 <h3 id="使用Parallel_compaction_Collector">使用Parallel compaction Collector</h3>
 <p>可以通过指定命令行参数-XX:+UseParllelOldGC的方式显示指定使用Parallel Compaction Collector。</p>
 <h2 id="Concurrent_Mark-Sweep(CMS)Collector">Concurrent Mark-Sweep(CMS)Collector</h2>
@@ -239,7 +244,7 @@ generational回收将内存分成多个generations，每个generation都是一�
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="pgcbznbbb3eadliv" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="0i04ztv6rdwsg9hk" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/07/10/gc/#disqus_thread" class="article-comment-link">Comments</a>
       
