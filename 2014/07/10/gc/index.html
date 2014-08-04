@@ -5,7 +5,8 @@
   
   <title>java 虚拟机垃圾回收原理 | MR.GUAN</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="垃圾回收的基本概念
+  <meta name="description" content="&lt;%- toc(page.content) %&gt;
+垃圾回收的基本概念
 垃圾回收器主要负责：
 
 为对象分配内存；
@@ -15,7 +16,8 @@
 <meta property="og:title" content="java 虚拟机垃圾回收原理">
 <meta property="og:url" content="http://guanxinquan.github.io/blog/blog/2014/07/10/gc/">
 <meta property="og:site_name" content="MR.GUAN">
-<meta property="og:description" content="垃圾回收的基本概念
+<meta property="og:description" content="&lt;%- toc(page.content) %&gt;
+垃圾回收的基本概念
 垃圾回收器主要负责：
 
 为对象分配内存；
@@ -30,7 +32,8 @@
 <meta property="og:image" content="/blog/pic/gc/cms_no_compactiong.png">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="java 虚拟机垃圾回收原理">
-<meta name="twitter:description" content="垃圾回收的基本概念
+<meta name="twitter:description" content="&lt;%- toc(page.content) %&gt;
+垃圾回收的基本概念
 垃圾回收器主要负责：
 
 为对象分配内存；
@@ -106,7 +109,8 @@
     
     <div class="article-entry" itemprop="articleBody">
       
-        <h1 id="垃圾回收的基本概念">垃圾回收的基本概念</h1>
+        <p>&lt;%- toc(page.content) %&gt;</p>
+<h1 id="垃圾回收的基本概念">垃圾回收的基本概念</h1>
 <p>垃圾回收器主要负责：</p>
 <ol>
 <li>为对象分配内存；</li>
@@ -242,11 +246,16 @@ generational回收将内存分成多个generations，每个generation都是一�
 <li>Finalizable<br>排在队列中等待执行finalizer方法的对象。</li>
 <li>Unfinalized<br>有finalizer方法，但是尚未在finalizer队列中等待finalized的对象。</li>
 </ul>
+<h1 id="参考文献">参考文献</h1>
+<ol>
+<li>Memory Management in the Java HotSpot™ Virtual Machine</li>
+<li><a href="http://www.oracle.com/technetwork/java/javase/gc-tuning-6-140523.html" target="_blank" rel="external">http://www.oracle.com/technetwork/java/javase/gc-tuning-6-140523.html</a></li>
+</ol>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="kq0m7240ywgk4a48" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="zr53ioc98zf4r71z" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/07/10/gc/#disqus_thread" class="article-comment-link">Comments</a>
       
