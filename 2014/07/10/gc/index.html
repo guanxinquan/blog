@@ -177,7 +177,7 @@ generational回收将内存分成多个generations，每个generation都是一�
 <p>虚拟机提供一些参数，用于控制代空间大小和代间比例。在了解详情之前需要理解两个概念，提交空间（committed space）和虚拟空间（virtual space）。虚拟机初始化时，整个堆空间被预留出来，可以通过-Xmx（最大heap使用空间）参数调整预留堆空间大小。如果-Xms参数指定的起始heap空间小于-Xmx指定的最大heap空间，那么并不是所有的预留空间都立刻提交到虚拟机实际分配内存资源。如图，没有提交分配内存的预留空间称为virtual space。heap区的不同代（持久代、老年代或者年轻代）根据需求在执行过程中继续申请分配内存空间，直到virtual space耗尽，代空间就不能再继续申请更多的内存空间。<br><img src="/blog/pic/gc/gc_generation_virtual_space.gif" alt="gc generation virtual space"></p>
 <h3 id="heap总大小">heap总大小</h3>
 <h4 id="非Parallel_Collector_heap总大小">非Parallel Collector heap总大小</h4>
-<p>对于非并行收集器（并行收集器在下小节讨论），默认情况下，每次垃圾回收都会调整heap区的大小（heap区指实际分配内存的部分，不包括virtual space），使得空闲和占用空间的比值在一定区间范围之内。主要受到-XX:MinHeapFreeRatio=<minimum>、-XX:XaxHeapFreeRatio=<maximum>、-Xms<min>和-Xmx<max>，几个参数控制，默认的32位solaris系统参数如下：<br>|parameter|Default Value|<br>|————-|——————-|<br>|MinHeapFreeRatio|40|<br>|MaxHeapFreeRatio|70|<br>|-Xms|3670k|<br>|-Xmx|64m|<br>根据这些参数的值，如果回收后空闲空间的比值低于40%，当前代需要扩充空间到能够保持空闲空间高于40%，除非到达代的最大空间；同理，如果空闲空间超过70%，当前代的空间就会缩小，保证空闲空间不超过70%，除非到达当前代的最小值。<br><br>这些默认设置，对于大型的应用可能纯在两个主要问题，其一，初始的heap空间太小，服务启动时需要经历多次full gc，并且不断调节heap区大小，导致服务启动缓慢；其二，默认最大heap太小，不适合大型的应用。下面给出指导意见：</max></min></maximum></minimum></p>
+<p>对于非并行收集器（并行收集器在下小节讨论），默认情况下，每次垃圾回收都会调整heap区的大小（heap区指实际分配内存的部分，不包括virtual space），使得空闲和占用空间的比值在一定区间范围之内。主要受到-XX:MinHeapFreeRatio=<minimum>、-XX:XaxHeapFreeRatio=<maximum>、-Xms<min>和-Xmx<max>，几个参数控制，默认的32位solaris系统参数如下：<br>parameter|Default Value<br>————-|——————-<br>MinHeapFreeRatio|40<br>MaxHeapFreeRatio|70<br>-Xms|3670k<br>-Xmx|64m<br>根据这些参数的值，如果回收后空闲空间的比值低于40%，当前代需要扩充空间到能够保持空闲空间高于40%，除非到达代的最大空间；同理，如果空闲空间超过70%，当前代的空间就会缩小，保证空闲空间不超过70%，除非到达当前代的最小值。<br><br>这些默认设置，对于大型的应用可能纯在两个主要问题，其一，初始的heap空间太小，服务启动时需要经历多次full gc，并且不断调节heap区大小，导致服务启动缓慢；其二，默认最大heap太小，不适合大型的应用。下面给出指导意见：</max></min></maximum></minimum></p>
 <ol>
 <li>除非web应用由于较长的pause时间而无法满足需求，否者，尽量分配更多的内存空间给虚拟机，默认的64MB太小；</li>
 <li>根据预期将-Xms和-Xmx设置为相同的值，避免虚拟机调整heap区的大小，缺点在于如果预测失误，虚拟机无法挽回过失（主要是heap占用了大量的无需被暂用的内存）；</li>
@@ -265,7 +265,7 @@ generational回收将内存分成多个generations，每个generation都是一�
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="6wn95qixeqhh2u5v" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="ztll16u9pjpjdtd1" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/07/10/gc/#disqus_thread" class="article-comment-link">Comments</a>
       
