@@ -5,8 +5,7 @@
   
   <title>java 虚拟机垃圾回收原理 | MR.GUAN</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="&lt;%- toc(page.content) %&gt;
-垃圾回收的基本概念
+  <meta name="description" content="垃圾回收的基本概念
 垃圾回收器主要负责：
 
 为对象分配内存；
@@ -16,8 +15,7 @@
 <meta property="og:title" content="java 虚拟机垃圾回收原理">
 <meta property="og:url" content="http://guanxinquan.github.io/blog/blog/2014/07/10/gc/">
 <meta property="og:site_name" content="MR.GUAN">
-<meta property="og:description" content="&lt;%- toc(page.content) %&gt;
-垃圾回收的基本概念
+<meta property="og:description" content="垃圾回收的基本概念
 垃圾回收器主要负责：
 
 为对象分配内存；
@@ -30,10 +28,10 @@
 <meta property="og:image" content="/blog/pic/gc/parallel_collector.png">
 <meta property="og:image" content="/blog/pic/gc/cms_gc.png">
 <meta property="og:image" content="/blog/pic/gc/cms_no_compactiong.png">
+<meta property="og:image" content="/blog/pic/gc/gc_generation_virtual_space.gif">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="java 虚拟机垃圾回收原理">
-<meta name="twitter:description" content="&lt;%- toc(page.content) %&gt;
-垃圾回收的基本概念
+<meta name="twitter:description" content="垃圾回收的基本概念
 垃圾回收器主要负责：
 
 为对象分配内存；
@@ -109,8 +107,7 @@
     
     <div class="article-entry" itemprop="articleBody">
       
-        <p>&lt;%- toc(page.content) %&gt;</p>
-<h1 id="垃圾回收的基本概念">垃圾回收的基本概念</h1>
+        <h1 id="垃圾回收的基本概念">垃圾回收的基本概念</h1>
 <p>垃圾回收器主要负责：</p>
 <ol>
 <li>为对象分配内存；</li>
@@ -175,7 +172,30 @@ generational回收将内存分成多个generations，每个generation都是一�
 <p>CMS适用于对暂停时间有要求的，并且在垃圾回收过程中，能够和并行应用程序共享处理进程的应用（由于CMS回收过程中，会占用应用程序的cpu周期）。一般来说，老年代中有大量存活的对象，并且运行在多核处理器上的应用程序，适用于CMS，最常见的例子如web 服务器。如果应用程序有暂停时间限制，可以考虑使用CMS。CMS同样适用于老年代大小适当的单核处理器交互式应用程序。<br></p>
 <h3 id="使用CMS">使用CMS</h3>
 <p>可以通过配置命令行参数-XX:UseConcMarkSweepGC参数来显示使用CMS。通过配置-XX:+CMSIncrementalMode来显示使用渐增式CMS。</p>
-<h1 id="虚拟机默认选择和调优">虚拟机默认选择和调优</h1>
+<h1 id="虚拟机调优">虚拟机调优</h1>
+<h2 id="代空间大小（sizing_of_generations）">代空间大小（sizing of generations）</h2>
+<p>虚拟机提供一些参数，用于控制代空间大小和代间比例。在了解详情之前需要理解两个概念，提交空间（committed space）和虚拟空间（virtual space）。虚拟机初始化时，整个堆空间被预留出来，可以通过-Xmx（最大heap使用空间）参数调整预留堆空间大小。如果-Xms参数指定的起始heap空间小于-Xmx指定的最大heap空间，那么并不是所有的预留空间都立刻提交到虚拟机实际分配内存资源。如图，没有提交分配内存的预留空间称为virtual space。heap区的不同代（持久代、老年代或者年轻代）根据需求在执行过程中继续申请分配内存空间，直到virtual space耗尽，代空间就不能再继续申请更多的内存空间。<br><img src="/blog/pic/gc/gc_generation_virtual_space.gif" alt="gc generation virtual space"></p>
+<h3 id="heap总大小">heap总大小</h3>
+<h4 id="非Parallel_Collector_heap总大小">非Parallel Collector heap总大小</h4>
+<p>对于非并行收集器（并行收集器在下小节讨论），默认情况下，每次垃圾回收都会调整heap区的大小（heap区指实际分配内存的部分，不包括virtual space），使得空闲和占用空间的比值在一定区间范围之内。主要受到-XX:MinHeapFreeRatio=<minimum>、-XX:XaxHeapFreeRatio=<maximum>、-Xms<min>和-Xmx<max>，几个参数控制，默认的32位solaris系统参数如下：<br>|parameter|Default Value|<br>|————-|——————-|<br>|MinHeapFreeRatio|40|<br>|MaxHeapFreeRatio|70|<br>|-Xms|3670k|<br>|-Xmx|64m|<br>根据这些参数的值，如果回收后空闲空间的比值低于40%，当前代需要扩充空间到能够保持空闲空间高于40%，除非到达代的最大空间；同理，如果空闲空间超过70%，当前代的空间就会缩小，保证空闲空间不超过70%，除非到达当前代的最小值。<br><br>这些默认设置，对于大型的应用可能纯在两个主要问题，其一，初始的heap空间太小，服务启动时需要经历多次full gc，并且不断调节heap区大小，导致服务启动缓慢；其二，默认最大heap太小，不适合大型的应用。下面给出指导意见：</max></min></maximum></minimum></p>
+<ol>
+<li>除非web应用由于较长的pause时间而无法满足需求，否者，尽量分配更多的内存空间给虚拟机，默认的64MB太小；</li>
+<li>根据预期将-Xms和-Xmx设置为相同的值，避免虚拟机调整heap区的大小，缺点在于如果预测失误，虚拟机无法挽回过失（主要是heap占用了大量的无需被暂用的内存）；</li>
+<li>通常，应用程序服务器处理核心越多，对应分配的heap空间应当越大，因为垃圾回收可以并行执行。</li>
+</ol>
+<h4 id="并行heap区大小">并行heap区大小</h4>
+<p>j2se5.0为并行垃圾回收提供了新的调优方式，通过命令行参数的形式，设置对回收器期望的最大暂停时间和吞吐量，让jvm自动调节heap区间的大小。</p>
+<h5 id="期望时间">期望时间</h5>
+<p>通过如下命令行配置最大暂停时间<br><br>     —XX:MaxGCPauseMillis=n<br>此参数作为并行回收器的一个提示，期望的垃圾回收暂停时间要小于或者等于n。并行回收器会调整heap区的大小和其他的一些垃圾回收相关的参数，尽量保证垃圾回收暂停时间小于n毫秒。这些调整可能会影响到应用的吞吐量，有时甚至无法满足预设的期望暂停时间要求。<br><br>期望最大暂停时间应用于所有年龄代中。通常，如果期望时间没有满足，回收器会缩小当前年龄代空间试图去满足目标。期望最大暂停时间没有默认值。</p>
+<h5 id="期望吞吐量">期望吞吐量</h5>
+<p>吞吐量定义为jvm处理垃圾回收所用时间与非垃圾回收所用时间（应用程序时间）的比值。可以通过命令行设置最小吞吐量<br>     —XX:GCTimeRatio=n<br>垃圾回收时间和应用时间的比值为<br>    1/(1+n)<br>例如-XX:GCTimeRatio=19,垃圾回收时间占总时间的比为5%。默认n=99（即1%的时间用于垃圾回收）。垃圾回收时间是所有年龄代垃圾回收的总时间。如果回收器无法满足期望吞吐量，会增大代内的空间大小，从而增大两次垃圾回收间的应用运行时间，大的空间需要更长时间才能够填满。</p>
+<h5 id="内存目标">内存目标</h5>
+<p>如果期望吞吐和期望最大暂停时间都满足，垃圾回收器会逐渐缩小heap区的大小，直到其中一个期望值无法满足（一般来说是吞吐量目标）。</p>
+<h5 id="期望优先级">期望优先级</h5>
+<p>并行垃圾回收器先尝试满足期望最大暂停时间，只有期望时间满足后才尝试满足吞吐目标，同理，仅在上述两个目标都满足的情况下，才尝试满足内存目标。</p>
+<h3 id="年轻代大小">年轻代大小</h3>
+<p>确定heap总大小后，年轻代大小是性能优化的一个关键。年轻代占用heap的比重越大，minor垃圾回收的频率就越低，由于heap总的空间有限，因此年轻代占用越大，老年代占用的空间就越小，full gc的频率就越高。具体的比率需要考虑应用程序对象的生命周期长度的分布。</p>
+<h2 id="虚拟机默认选择和调优">虚拟机默认选择和调优</h2>
 <p>在j2se5.0中，默认情况下，java虚拟机根据应用程序运行的操作环境决定垃圾回收器的种类（算法）、堆栈空间的大小以及运行方式（client或者server）。虚拟机的默认选择能够满足大部分应用的需求，相对于先前的虚拟机，启动时可以使用更少的参数。</p>
 <h2 id="自动选择回收算法、heap大小和运行方式">自动选择回收算法、heap大小和运行方式</h2>
 <p>server-class主机被定义为满足如下条件<br></p>
@@ -192,16 +212,6 @@ generational回收将内存分成多个generations，每个generation都是一�
 <li>初始大小为物理内存的1/64到1GB。（注意，由于server-class服务器被定义为至少有2GB的物理内存空间，因此最小的初始内存大小为32MB）</li>
 <li>最大的heap大小为1/4物理大小到1GB。</li>
 </ul>
-<h2 id="基于行为的并行垃圾回收算法调优">基于行为的并行垃圾回收算法调优</h2>
-<p>j2se5.0为并行垃圾回收提供了新的调优方式，通过命令行参数的形式，设置对回收器期望的最大暂停时间和吞吐量，让jvm自动调节heap区间的大小。</p>
-<h3 id="期望的最大暂停时间">期望的最大暂停时间</h3>
-<p>通过如下命令行配置最大暂停时间<br><br>     —XX:MaxGCPauseMillis=n<br>这个参数会被并行回收器作为一个提示，期望的垃圾回收暂停时间要小于或者等于n。并行回收器会调整heap区的大小和其他的一些垃圾回收相关的参数，保证垃圾回收的时间小于n毫秒。这些调整很可能会影响到应用的吞吐量，有时甚至无法满足预设的期望暂停时间要求。<br><br>期望的最大暂停时间会被引用于所有的年龄代。一般来说，如果期望时间没有满足，回收器会缩小当前年龄代空间试图去满足目标。期望最大暂停时间没有默认值。</p>
-<h3 id="期望吞吐量">期望吞吐量</h3>
-<p>吞吐量定义为jvm处理垃圾回收所用时间与非垃圾回收所用时间（应用程序时间）的比值。可以通过命令行设置最小吞吐量<br>     —XX:GCTimeRatio=n<br>垃圾回收时间和应用时间的比值为<br>    1/(1+n)<br>例如-XX:GCTimeRatio=19,那么垃圾回收的时间占总时间的比为5%。默认n=99（即1%的时间用于垃圾回收）。垃圾回收时间是所有年龄代垃圾回收的总时间。如果回收器无法满足期望吞吐量，会增大代内的空间大小，从而增大两次垃圾回收间的应用运行时间，大的空间需要更长时间才能够填满。</p>
-<h3 id="内存目标">内存目标</h3>
-<p>如果期望吞吐和期望最大暂停时间都满足，垃圾回收器会逐渐缩小heap区的大小，直到其中一个期望值无法满足（一般来说是吞吐量目标）。</p>
-<h3 id="期望优先级">期望优先级</h3>
-<p>并行垃圾回收器先尝试满足期望最大暂停时间，只有期望时间满足后才尝试满足吞吐目标，同理，仅在上述两个目标都满足的情况下，才尝试满足内存目标。</p>
 <h1 id="建议">建议</h1>
 <p>正如前面提到的，jvm能够根据环境自动选择垃圾回收算法、虚拟机启动的类型、heap配置，对大多数应用来说这些已经足够了。对垃圾回收器配置的最初建议为什么都不做，让系统根据应用运行的操作系统和硬件环境自动选择！之后测试应用程序，如果他具有较高的吞吐率和较低的暂停时间，那么，根本不用配置任何垃圾回收选项。<br><br>另一方面，如果应用程序因为垃圾回收纯在性能问题，首先综合系统和应用的特点，判断默认的垃圾回收方式是否纯在问题，如果纯在问题，选着适合的回收算法，查看性能是否满足需求。<br><br>可以使用一些工具来测试应用程序的性能，基于测试结果，可以对垃圾回收相关的选项进行调节，例如那些控制heap大小和回收行为的参数。需要注意：最好的gc调优方法为，先衡量（Measure）后调整。不要过度调优，由于应用程序的数据、硬件环境包括虚拟机算法都可能随着时间变化。</p>
 <h1 id="OutOfMemoryError">OutOfMemoryError</h1>
@@ -255,7 +265,7 @@ generational回收将内存分成多个generations，每个generation都是一�
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="zr53ioc98zf4r71z" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="6wn95qixeqhh2u5v" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/07/10/gc/#disqus_thread" class="article-comment-link">Comments</a>
       
