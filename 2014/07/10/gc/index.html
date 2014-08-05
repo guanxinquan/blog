@@ -178,7 +178,7 @@ generational回收将内存分成多个generations，每个generation都是一�
 <h3 id="heap总大小">heap总大小</h3>
 <h4 id="非Parallel_Collector_heap总大小">非Parallel Collector heap总大小</h4>
 <p>对于非并行收集器（并行收集器在下小节讨论），默认情况下，每次垃圾回收都会调整heap区的大小（heap区指实际分配内存的部分，不包括virtual space），使得空闲和占用空间的比值在一定区间范围之内。主要受到-XX:MinHeapFreeRatio=<minimum>、-XX:XaxHeapFreeRatio=<maximum>、-Xms<min>和-Xmx<max>，几个参数控制，默认的32位solaris系统参数如下：</max></min></maximum></minimum></p>
-<table><br><tr><br><td>parameter</td><br><td>Default Value</td><br></tr><br><tr><br><td>MinHeapFreeRatio</td><br><td>40</td><br></tr><br><tr><br><td>MaxHeapFreeRatio</td><br><td>70</td><br></tr><br><tr><br><td>-Xms</td><br><td>3670k</td><br></tr><br><tr><br><td>-Xmx</td><br><td>64m</td><br></tr><br></table>
+<table><tr><td>parameter</td><td>Default Value</td></tr><tr><td>MinHeapFreeRatio</td><td>40</td></tr><tr><td>MaxHeapFreeRatio</td><td>70</td></tr><tr><td>-Xms</td><td>3670k</td></tr><tr><td>-Xmx</td><td>64m</td></tr></table>
 
 <p>根据这些参数的值，如果回收后空闲空间的比值低于40%，当前代需要扩充空间到能够保持空闲空间高于40%，除非到达代的最大空间；同理，如果空闲空间超过70%，当前代的空间就会缩小，保证空闲空间不超过70%，除非到达当前代的最小值。<br><br>这些默认设置，对于大型的应用可能纯在两个主要问题，其一，初始的heap空间太小，服务启动时需要经历多次full gc，并且不断调节heap区大小，导致服务启动缓慢；其二，默认最大heap太小，不适合大型的应用。下面给出指导意见：</p>
 <ol>
@@ -268,7 +268,7 @@ generational回收将内存分成多个generations，每个generation都是一�
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="cdbc7ew6sh6qesa9" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="79spycip4qdb3q42" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/07/10/gc/#disqus_thread" class="article-comment-link">Comments</a>
       
