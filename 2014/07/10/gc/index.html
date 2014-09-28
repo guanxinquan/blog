@@ -177,10 +177,10 @@ generational回收将内存分成多个generations，每个generation都是一�
 <p>虚拟机提供一些参数，用于控制代空间大小和代间比例。在了解详情之前需要理解两个概念，提交空间（committed space）和虚拟空间（virtual space）。虚拟机初始化时，整个堆空间被预留出来，可以通过-Xmx（最大heap使用空间）参数调整预留堆空间大小。如果-Xms参数指定的起始heap空间小于-Xmx指定的最大heap空间，那么并不是所有的预留空间都立刻提交到虚拟机实际分配内存资源。如图，没有提交分配内存的预留空间称为virtual space。heap区的不同代（持久代、老年代或者年轻代）根据需求在执行过程中继续申请分配内存空间，直到virtual space耗尽，代空间就不能再继续申请更多的内存空间。<br><img src="/blog/pic/gc/gc_generation_virtual_space.gif" alt="gc generation virtual space"></p>
 <h3 id="heap总大小">heap总大小</h3>
 <h4 id="非Parallel_Collector_heap总大小">非Parallel Collector heap总大小</h4>
-<p>对于非并行收集器（并行收集器在下小节讨论），默认情况下，每次垃圾回收都会调整heap区的大小（heap区指实际分配内存的部分，不包括virtual space），使得空闲和占用空间的比值在一定区间范围之内。主要受到-XX:MinHeapFreeRatio=<minimum>、-XX:XaxHeapFreeRatio=<maximum>、-Xms<min>和-Xmx<max>，几个参数控制，默认的32位solaris系统参数如下：</max></min></maximum></minimum></p>
+<p>对于非并行收集器（并行收集器在下小节讨论），默认情况下，每次垃圾回收都会调整heap区的大小（heap区指实际分配内存的部分，不包括virtual space），使得空闲和占用空间的比值在一定区间范围之内。主要受到-XX:MinHeapFreeRatio=<minimum>、-XX:MaxHeapFreeRatio=<maximum>、-Xms<min>和-Xmx<max>，几个参数控制，默认的32位solaris系统参数如下：</max></min></maximum></minimum></p>
 <table><tr><td>parameter</td><td>Default Value</td></tr><tr><td>MinHeapFreeRatio</td><td>40</td></tr><tr><td>MaxHeapFreeRatio</td><td>70</td></tr><tr><td>-Xms</td><td>3670k</td></tr><tr><td>-Xmx</td><td>64m</td></tr></table>
 
-<p>根据这些参数的值，如果回收后空闲空间的比值低于40%，当前代需要扩充空间到能够保持空闲空间高于40%，除非到达代的最大空间；同理，如果空闲空间超过70%，当前代的空间就会缩小，保证空闲空间不超过70%，除非到达当前代的最小值。<br><br>这些默认设置，对于大型的应用可能纯在两个主要问题，其一，初始的heap空间太小，服务启动时需要经历多次full gc，并且不断调节heap区大小，导致服务启动缓慢；其二，默认最大heap太小，不适合大型的应用。下面给出指导意见：</p>
+<p>根据这些参数的值，如果回收后空闲空间的比值低于40%，当前代需要扩充空间到能够保持空闲空间高于40%，除非到达代的最大空间；同理，如果空闲空间超过70%，当前代的空间就会缩小，保证空闲空间不超过70%，除非到达当前代的最小值。<br><br>这些默认设置，对于大型的应用可能存在两个主要问题，其一，初始的heap空间太小，服务启动时需要经历多次full gc，并且不断调节heap区大小，导致服务启动缓慢；其二，默认最大heap太小，不适合大型的应用。下面给出指导意见：</p>
 <ol>
 <li>除非web应用由于较长的pause时间而无法满足需求，否者，尽量分配更多的内存空间给虚拟机，默认的64MB太小；</li>
 <li>根据预期将-Xms和-Xmx设置为相同的值，避免虚拟机调整heap区的大小，缺点在于如果预测失误，虚拟机无法挽回过失（主要是heap占用了大量的无需被暂用的内存）；</li>
@@ -197,7 +197,18 @@ generational回收将内存分成多个generations，每个generation都是一�
 <h5 id="期望优先级">期望优先级</h5>
 <p>并行垃圾回收器先尝试满足期望最大暂停时间，只有期望时间满足后才尝试满足吞吐目标，同理，仅在上述两个目标都满足的情况下，才尝试满足内存目标。</p>
 <h3 id="年轻代大小">年轻代大小</h3>
-<p>确定heap总大小后，年轻代大小是性能优化的一个关键。年轻代占用heap的比重越大，minor垃圾回收的频率就越低，由于heap总的空间有限，因此年轻代占用越大，老年代占用的空间就越小，full gc的频率就越高。具体的比率需要考虑应用程序对象的生命周期长度的分布。</p>
+<p>确定heap总大小后，年轻代大小是性能优化的一个关键。年轻代占用heap的比重越大，minor垃圾回收的频率就越低，由于heap总的空间有限，因此年轻代占用越大，老年代占用的空间就越小，full gc的频率就越高。具体的比率需要考虑应用程序对象的生命周期长度的分布。<br>默认情况下，年轻代大小通过NewRatio参数控制。例如，-XX:NewRatio=3，那面年轻代与老年代的空间比就是1:3，换句话说，eden区和survivor区域大小的和为总内存空间的四分之一。<br>NewSize和MaxNewSize定义了年轻代空间的最小值和最大值，如果这两个参数取值相同，与将-Xms和-Xmx设置相同值固定整个heap区大小相似，将NewSize和MaxNewSize设置为相同值与通过设置一个整数倍数的NewRatio相比，能够更精细调节年轻代空间大小。</p>
+<h4 id="survivor区域大小">survivor区域大小</h4>
+<p>如果需要的话，通过SurvivorRatio参数控制survivor区域大小，但是它对性能调优效果并不明显。例如，设置-XX:SurvivorRation=6, survivor与Eden暂用比为1:6，换句话说，每个survivor空间是Eden空间的六分之一，或者是整个年轻代空间的八分之一。<br><br>survivor占用的空间太小，gc将多余的数据直接拷贝到持久代，如果survivor占用空间太大，大部分的空间都是未被使用。每一个gc都会选着一个阈值，用于控制对象在晋升为老年代前拷贝的次数。这个阈值一般是控制回收后保持survivor空间半满状态。命令行-XX:+PrintTenuringDistribution可以输出这个阈值和在年轻代空间中对象的年龄。同时这个参数对于观察对象年龄代的分布情况也很有用。<br>下表中给出32位系统中的默认参数值：<br></p>
+<p><table><tr><td>Parameter</td><td>clinet jvm</td><td>server jvm</td></tr><tr><td>NewRatio</td><td>8</td><td>2</td></tr><tr><td>NewSize</td><td>2228K</td><td>2228k</td></tr><tr><td>MaxNewSize</td><td>not limited</td><td>not limited</td></tr><tr><td>survivorRatio</td><td>32</td><td>32</td></tr></table><br>MaxNewSize如果没有明确设定，这个值可以通过虚拟机可暂用的总内存空间和NewRatio两个值计算所得。</p>
+<p>下面对服务端空间配置建议：</p>
+<ol>
+<li>首先要计算能够提供给虚拟机的最大内存空间，之后通过渐进方式调节年轻代空间的大小，找到最好的性能比例（需要注意，最大的堆空间大小应当小于实际内存空间大小，以避免过多的内存页面访问失败和抖动）。</li>
+<li>当Xmx确定后，逐渐地缩小老年代空间的大小，增加年轻代空间大小。最后保证老年代有足够的空间保存应用程序需要访问的对象，并且为老年代额外预留10%-20%（或者更多）的空间。</li>
+<li>年轻代需要分配足够的内存空间，当有更多的处理核心时，应该加大年轻代的占用空间，因为回收可以并行执行。</li>
+</ol>
+<h4 id="permanent区域大小">permanent区域大小</h4>
+<p>对于大多数应用程序来说，持久区对垃圾回收的性能影响并不显著，但是某些特殊的应用程序，例如需要动态生成代码或者加载很多类的情况，比如说，某些jsp应用需要更大的持久区空间，可以通过-XX:MaxPermSize设置持久区空间大小。</p>
 <h2 id="虚拟机默认选择和调优">虚拟机默认选择和调优</h2>
 <p>在j2se5.0中，默认情况下，java虚拟机根据应用程序运行的操作环境决定垃圾回收器的种类（算法）、堆栈空间的大小以及运行方式（client或者server）。虚拟机的默认选择能够满足大部分应用的需求，相对于先前的虚拟机，启动时可以使用更少的参数。</p>
 <h2 id="自动选择回收算法、heap大小和运行方式">自动选择回收算法、heap大小和运行方式</h2>
@@ -268,7 +279,7 @@ generational回收将内存分成多个generations，每个generation都是一�
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="79spycip4qdb3q42" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="t5jeopvqkbq2h1pe" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/07/10/gc/#disqus_thread" class="article-comment-link">Comments</a>
       
