@@ -134,8 +134,23 @@ typedef struct dict {
     } v;
     <span class="keyword">struct</span> dictEntry *next;
 } dictEntry;
-</code></pre><p>dictEntry表示map中的一个键值对，其中key是一个string，value可以是无符号64位（u64）整数，或者有符号64位整数（s64）或者是一个双精度浮点类型（d）当然还可以是String、map、list、set、zset（val）等类型，需要注意dictEntity指针类型的next可以看出，dictEntity会形成一个链表。</p>
-<p>redis的hashmap形式如下图：<br><img src="/blog/pic/redis/redis_table.png" alt="redis table"><br>从图中可以看出，redis中用于存储key和value的hashmap，实际上是一个纵向为一维数组，横向为链表结构的广义表。从下面的代码可以得出这个结论。</p>
+</code></pre><p>dictEntry表示map中的一个键值对,其中v是键值对的value，是一个64位的union，其表示格式如下：<br>    typedef struct redisObject {<br>        unsigned type:4;<br>        unsigned encoding:4;<br>        unsigned lru:REDIS_LRU_BITS; /<em> lru time (relative to server.lruclock) </em>/<br>        int refcount;<br>        void *ptr;<br>    } robj;<br>按照robj计算，tpye+encoding+lru+refcount+ptr = 4+4+24+16+16 = 64. 值的type可以取下面的值：</p>
+<pre><code><span class="preprocessor">#<span class="keyword">define</span> REDIS_STRING 0</span>
+<span class="preprocessor">#<span class="keyword">define</span> REDIS_LIST 1</span>
+<span class="preprocessor">#<span class="keyword">define</span> REDIS_SET 2</span>
+<span class="preprocessor">#<span class="keyword">define</span> REDIS_ZSET 3</span>
+<span class="preprocessor">#<span class="keyword">define</span> REDIS_HASH 4</span>
+<span class="preprocessor">#<span class="keyword">define</span> REDIS_HASH_ZIPMAP 9</span>
+<span class="preprocessor">#<span class="keyword">define</span> REDIS_LIST_ZIPLIST 10</span>
+<span class="preprocessor">#<span class="keyword">define</span> REDIS_SET_INTSET 11</span>
+<span class="preprocessor">#<span class="keyword">define</span> REDIS_ZSET_ZIPLIST 12</span>
+<span class="preprocessor">#<span class="keyword">define</span> REDIS_HASH_ZIPLIST 13</span>
+</code></pre><p>encoding可以取以下的值：</p>
+<pre><code><span class="preprocessor">#<span class="keyword">define</span> REDIS_ENCODING_RAW 0    /* Raw representation */</span>
+<span class="preprocessor">#<span class="keyword">define</span> REDIS_ENCODING_INT 1    /* Encoded as integer */</span>
+<span class="preprocessor">#<span class="keyword">define</span> REDIS_ENCODING_ZIPMAP 2 /* Encoded as zipmap */</span>
+<span class="preprocessor">#<span class="keyword">define</span> REDIS_ENCODING_HT 3     /* Encoded as a hash table */</span>
+</code></pre><p>redis的hashmap形式如下图：<br><img src="/blog/pic/redis/redis_table.png" alt="redis table"><br>从图中可以看出，redis中用于存储key和value的hashmap，实际上是一个纵向为一维数组，横向为链表结构的广义表。从下面的代码可以得出这个结论。</p>
 <pre><code>n.table = <span class="built_in">calloc</span>(realsize,<span class="keyword">sizeof</span>(dictEntry*));
 </code></pre><p>这样做的好处是，在查找某个key时，通过hash算法求出key值对应的数组下标，获取相同hash值的链表后，遍历链表获取对应key值即可。获取过程如下：</p>
 <pre><code><span class="keyword">static</span> dictEntry *dictFind(dict *ht, <span class="keyword">const</span> <span class="keyword">void</span> *key) {
@@ -152,13 +167,39 @@ typedef struct dict {
     }
     <span class="keyword">return</span> <span class="literal">NULL</span>;
 }
-</code></pre><h2 id="1-2-_渐进式rehash">1.2. 渐进式rehash</h2>
+</code></pre><h2 id="1-2-_redis_过期时间">1.2. redis 过期时间</h2>
+<p>redis的db结构定义如下：</p>
+<pre><code><span class="keyword">typedef</span> <span class="keyword">struct</span> redisDb {
+    dict *dict;                 <span class="comment">/* The keyspace for this DB */</span>
+    dict *expires;              <span class="comment">/* Timeout of keys with a timeout set */</span>
+    dict *blocking_keys;        <span class="comment">/* Keys with clients waiting for data (BLPOP) */</span>
+    dict *ready_keys;           <span class="comment">/* Blocked keys that received a PUSH */</span>
+    dict *watched_keys;         <span class="comment">/* WATCHED keys for MULTI/EXEC CAS */</span>
+    <span class="keyword">int</span> <span class="keyword">id</span>;
+    <span class="keyword">long</span> <span class="keyword">long</span> avg_ttl;          <span class="comment">/* Average TTL, just for stats */</span>
+} redisDb;
+</code></pre><p>其中dict用于存储redis中的key和value键值对。expires与key-value的dict相似也是个map，如果在设置key时，设置了过期时间，那么对应的在expires中会添加一个对应的key-expire键值对。需要访问某个key时，redis需要先判断这个key是否过期，如下代码：</p>
+<pre><code>long long getExpire(redisDb <span class="subst">*</span>db, robj <span class="subst">*</span>key) {
+    dictEntry <span class="subst">*</span>de;
+
+    <span class="comment">/* No expire? return ASAP */</span>
+    <span class="keyword">if</span> (dictSize(db<span class="subst">-&gt;</span>expires) <span class="subst">==</span> <span class="number">0</span> <span class="subst">||</span>
+       (de <span class="subst">=</span> dictFind(db<span class="subst">-&gt;</span>expires,key<span class="subst">-&gt;</span>ptr)) <span class="subst">==</span> <span class="built_in">NULL</span>) <span class="keyword">return</span> <span class="subst">-</span><span class="number">1</span>;
+
+    <span class="comment">/* The entry was found in the expire dict, this means it should also be present in the main dict (safety check). */</span>
+    redisAssertWithInfo(<span class="built_in">NULL</span>,key,dictFind(db<span class="subst">-&gt;</span>dict,key<span class="subst">-&gt;</span>ptr) <span class="subst">!=</span> <span class="built_in">NULL</span>);
+    <span class="keyword">return</span> dictGetSignedIntegerVal(de);
+}
+</code></pre><p>其中dictGetSignedIntegerVal定义如下：</p>
+<pre><code><span class="preprocessor">#<span class="keyword">define</span> dictGetSignedIntegerVal(he) ((he)-&gt;v.s64)</span>
+</code></pre><p>可以看出<code>(he)-&gt;v.s64</code>使用的是dict定义中union的s64而不是val，这也是dic为什么使用union的原因。<br><br>此外，如果没有为key设置过期时间，那么会节省很多空间。</p>
+<h2 id="1-3-_渐进式rehash">1.3. 渐进式rehash</h2>
 <p>当hashtable中承载了过多的entity后，添加新key值时，冲突情况会越来越多，并且table中每个list长度会不断增长，此时查找key需要消耗更多时间。因此，当entity量足够大时，table需要rehash。如果使用传统hash算法，当redis中存在大量的entity时，将一个hash table的数据全部拷贝到新table中，将会消耗大量时间，因此，redis使用渐进式rehash。</p><p><br>在dict的数据结构中（<code>dictht ht[2];</code>）创建两个dictht，其中ht[0]表示旧的hashtable，ht[1]表示新hashtable。当ht[0]中有过多的entity后，redis为ht[1]分配一个足够大（一般是原table的两倍）的空间，新添加的entity都会放到ht[1]中，每当key查询时，如果ht[0]仍然有数据（通过<code>long rehashidx;</code>是否大于-1判断），就将ht[0]的一行数据（就是一个list列表）取出，对列表的每个entity重新计算，并放到ht[1]中。当系统继续运行一段时间后，所有数据都只在ht[1]中，此时ht[0]就可以释放空间（<code>long rehashidx;</code>被设置成-1），ht[0]空间释放后，将ht[0]指向ht[1]。例如，在dictFind中包含如下语句：<code>if (dictIsRehashing(d)) _dictRehashStep(d);</code>,可以看出，每次查找key时，都会判断是否在rehash（通过判断rehashidx），如果ht[0]中还有元素没有移过来，会调用_dictRehashStep.(参考dic.c中的<code>dictRehash</code>函数）。</p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/10/01/redis/" data-id="y6bl4eho2ghz40mu" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/10/01/redis/" data-id="n1wu3jnixdu9vhun" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/10/01/redis/#disqus_thread" class="article-comment-link">Comments</a>
       
