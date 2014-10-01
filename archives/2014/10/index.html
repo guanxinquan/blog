@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   
-  <title>Tag: fst | MR.GUAN</title>
+  <title>Archives: 2014/10 | MR.GUAN</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="description" content="just for fun">
 <meta property="og:type" content="website">
 <meta property="og:title" content="MR.GUAN">
-<meta property="og:url" content="http://guanxinquan.github.io/blog/blog/tags/fst/">
+<meta property="og:url" content="http://guanxinquan.github.io/blog/blog/archives/2014/10/">
 <meta property="og:site_name" content="MR.GUAN">
 <meta property="og:description" content="just for fun">
 <meta name="twitter:card" content="summary">
@@ -60,10 +60,10 @@
       <div class="outer">
         <section id="main">
   
-    <article id="post-lucene_FST_parser" class="article article-type-post" itemscope itemprop="blogPost">
+    <article id="post-redis" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
-    <a href="/blog/2014/06/17/lucene_FST_parser/" class="article-date">
-  <time datetime="2014-06-17T09:39:40.000Z" itemprop="datePublished">Jun 17 2014</time>
+    <a href="/blog/2014/10/01/redis/" class="article-date">
+  <time datetime="2014-10-01T04:45:00.000Z" itemprop="datePublished">Oct 1 2014</time>
 </a>
     
   <div class="article-category">
@@ -78,7 +78,7 @@
         
   
     <h1 itemprop="name">
-      <a class="article-title" href="/blog/2014/06/17/lucene_FST_parser/">lucene中的FST算法分析</a>
+      <a class="article-title" href="/blog/2014/10/01/redis/">redis 算法研究</a>
     </h1>
   
 
@@ -86,23 +86,31 @@
     
     <div class="article-entry" itemprop="articleBody">
       
-        <h1 id="前言">前言</h1>
-<p>FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。</p>
-<p>在FST构建过程中，term的文本信息(按照字典顺序排序）作为FST的input，term的存储位置（或者次序）作为FST的output，<input,output>二元组将以FST的形式存储在内存中（<strong>请注意input和output都是有序的</strong>）。检索时，根据input，通过计算FST中的路径上的权值信息，获取到output数据，最终在磁盘上定位term的其它附加信息。同时FST还能够快速的判断一个term是否在lucene中。<br>
+        <h1 id="1-_Redis_key和value的存储形式">1. Redis key和value的存储形式</h1>
+<h1 id="1-1-_基本数据结构">1.1. 基本数据结构</h1>
+<p>redis中使用hashmap存储key和对应的value。hashmap的定义如下：</p>
+<pre><code>typedef <span class="keyword">struct</span> dict {
+    dictType *<span class="class"><span class="keyword">type</span>;</span>
+    <span class="keyword">void</span> *privdata;
+    dictht ht[<span class="number">2</span>];
+    long rehashidx; /* rehashing not <span class="keyword">in</span> progress <span class="keyword">if</span> rehashidx == -<span class="number">1</span> */
+    int iterators; /* number <span class="keyword">of</span> iterators currently running */
+} dict; 
+</code></pre><p>
         
           <p class="article-more-link">
-            <a href="/blog/2014/06/17/lucene_FST_parser/#more">Read More</a>
+            <a href="/blog/2014/10/01/redis/#more">Read More</a>
           </p>
         
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="5d08matmxgw9y5p7" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/10/01/redis/" data-id="y6bl4eho2ghz40mu" class="article-share-link">Share</a>
       
-        <a href="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/#disqus_thread" class="article-comment-link">Comments</a>
+        <a href="http://guanxinquan.github.io/blog/2014/10/01/redis/#disqus_thread" class="article-comment-link">Comments</a>
       
       
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/fst/">fst</a></li></ul>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/redis/">redis</a></li></ul>
 
     </footer>
   </div>

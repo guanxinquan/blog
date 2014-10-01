@@ -60,6 +60,65 @@
       <div class="outer">
         <section id="main">
   
+    <article id="post-redis" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/blog/2014/10/01/redis/" class="article-date">
+  <time datetime="2014-10-01T04:45:00.000Z" itemprop="datePublished">Oct 1 2014</time>
+</a>
+    
+  <div class="article-category">
+    <a class="article-category-link" href="/blog/categories/算法/">算法</a>
+  </div>
+
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/blog/2014/10/01/redis/">redis 算法研究</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h1 id="1-_Redis_key和value的存储形式">1. Redis key和value的存储形式</h1>
+<h1 id="1-1-_基本数据结构">1.1. 基本数据结构</h1>
+<p>redis中使用hashmap存储key和对应的value。hashmap的定义如下：</p>
+<pre><code>typedef <span class="keyword">struct</span> dict {
+    dictType *<span class="class"><span class="keyword">type</span>;</span>
+    <span class="keyword">void</span> *privdata;
+    dictht ht[<span class="number">2</span>];
+    long rehashidx; /* rehashing not <span class="keyword">in</span> progress <span class="keyword">if</span> rehashidx == -<span class="number">1</span> */
+    int iterators; /* number <span class="keyword">of</span> iterators currently running */
+} dict; 
+</code></pre><p>
+        
+          <p class="article-more-link">
+            <a href="/blog/2014/10/01/redis/#more">Read More</a>
+          </p>
+        
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://guanxinquan.github.io/blog/2014/10/01/redis/" data-id="y6bl4eho2ghz40mu" class="article-share-link">Share</a>
+      
+        <a href="http://guanxinquan.github.io/blog/2014/10/01/redis/#disqus_thread" class="article-comment-link">Comments</a>
+      
+      
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/redis/">redis</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
     <article id="post-gc" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/blog/2014/07/10/gc/" class="article-date">
@@ -100,7 +159,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="78bj5xxxgi63cgcp" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="zsu6qcxrbgozrypa" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/07/10/gc/#disqus_thread" class="article-comment-link">Comments</a>
       
@@ -151,7 +210,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="zpi63svx5zmpscor" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="5d08matmxgw9y5p7" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/#disqus_thread" class="article-comment-link">Comments</a>
       
@@ -197,7 +256,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/firstblog/" data-id="4i94gmv6g3qws0ig" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/firstblog/" data-id="lff3iehpayv90ebe" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/06/17/firstblog/#disqus_thread" class="article-comment-link">Comments</a>
       
@@ -220,7 +279,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Categories</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/blog/categories/算法/">算法</a><span class="category-list-count">2</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/blog/categories/算法/">算法</a><span class="category-list-count">3</span></li></ul>
     </div>
   </div>
 
@@ -229,7 +288,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Tags</h3>
     <div class="widget">
-      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/fst/">fst</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/gc/">gc</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/生活/">生活</a><span class="tag-list-count">1</span></li></ul>
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/fst/">fst</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/gc/">gc</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/redis/">redis</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/生活/">生活</a><span class="tag-list-count">1</span></li></ul>
     </div>
   </div>
 
@@ -238,7 +297,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Tag Cloud</h3>
     <div class="widget tagcloud">
-      <a href="/blog/tags/fst/" style="font-size: NaNpx;">fst</a><a href="/blog/tags/gc/" style="font-size: NaNpx;">gc</a><a href="/blog/tags/生活/" style="font-size: NaNpx;">生活</a>
+      <a href="/blog/tags/fst/" style="font-size: NaNpx;">fst</a><a href="/blog/tags/gc/" style="font-size: NaNpx;">gc</a><a href="/blog/tags/redis/" style="font-size: NaNpx;">redis</a><a href="/blog/tags/生活/" style="font-size: NaNpx;">生活</a>
     </div>
   </div>
 
@@ -247,7 +306,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Archives</h3>
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/blog/archives/2014/07">July 2014</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/blog/archives/2014/06">June 2014</a><span class="archive-list-count">2</span></li></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/blog/archives/2014/10">October 2014</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/blog/archives/2014/07">July 2014</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/blog/archives/2014/06">June 2014</a><span class="archive-list-count">2</span></li></ul>
     </div>
   </div>
 
@@ -257,6 +316,10 @@
     <h3 class="widget-title">Recents</h3>
     <div class="widget">
       <ul>
+        
+          <li>
+            <a href="/blog/2014/10/01/redis/">redis 算法研究</a>
+          </li>
         
           <li>
             <a href="/blog/2014/07/10/gc/">java 虚拟机垃圾回收原理</a>

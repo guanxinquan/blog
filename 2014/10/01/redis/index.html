@@ -3,17 +3,39 @@
 <head>
   <meta charset="utf-8">
   
-  <title>Archives: 2014 | MR.GUAN</title>
+  <title>redis 算法研究 | MR.GUAN</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="just for fun">
-<meta property="og:type" content="website">
-<meta property="og:title" content="MR.GUAN">
-<meta property="og:url" content="http://guanxinquan.github.io/blog/blog/archives/2014/">
+  <meta name="description" content="1. Redis key和value的存储形式
+1.1. 基本数据结构
+redis中使用hashmap存储key和对应的value。hashmap的定义如下：
+typedef struct dict {
+    dictType *type;
+    void *privdata;
+    dictht ht[2];
+    long rehashidx; /* rehashing not in">
+<meta property="og:type" content="article">
+<meta property="og:title" content="redis 算法研究">
+<meta property="og:url" content="http://guanxinquan.github.io/blog/blog/2014/10/01/redis/">
 <meta property="og:site_name" content="MR.GUAN">
-<meta property="og:description" content="just for fun">
+<meta property="og:description" content="1. Redis key和value的存储形式
+1.1. 基本数据结构
+redis中使用hashmap存储key和对应的value。hashmap的定义如下：
+typedef struct dict {
+    dictType *type;
+    void *privdata;
+    dictht ht[2];
+    long rehashidx; /* rehashing not in">
+<meta property="og:image" content="/blog/pic/redis/redis_table.png">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="MR.GUAN">
-<meta name="twitter:description" content="just for fun">
+<meta name="twitter:title" content="redis 算法研究">
+<meta name="twitter:description" content="1. Redis key和value的存储形式
+1.1. 基本数据结构
+redis中使用hashmap存储key和对应的value。hashmap的定义如下：
+typedef struct dict {
+    dictType *type;
+    void *privdata;
+    dictht ht[2];
+    long rehashidx; /* rehashing not in">
   
     <link rel="alternative" href="/atom.xml" title="MR.GUAN" type="application/atom+xml">
   
@@ -58,9 +80,7 @@
   </div>
 </header>
       <div class="outer">
-        <section id="main">
-  
-    <article id="post-redis" class="article article-type-post" itemscope itemprop="blogPost">
+        <section id="main"><article id="post-redis" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/blog/2014/10/01/redis/" class="article-date">
   <time datetime="2014-10-01T04:45:00.000Z" itemprop="datePublished">Oct 1 2014</time>
@@ -77,8 +97,8 @@
       <header class="article-header">
         
   
-    <h1 itemprop="name">
-      <a class="article-title" href="/blog/2014/10/01/redis/">redis 算法研究</a>
+    <h1 class="article-title" itemprop="name">
+      redis 算法研究
     </h1>
   
 
@@ -96,12 +116,45 @@
     long rehashidx; /* rehashing not <span class="keyword">in</span> progress <span class="keyword">if</span> rehashidx == -<span class="number">1</span> */
     int iterators; /* number <span class="keyword">of</span> iterators currently running */
 } dict; 
-</code></pre><p>
-        
-          <p class="article-more-link">
-            <a href="/blog/2014/10/01/redis/#more">Read More</a>
-          </p>
-        
+</code></pre><p><a id="more"></a><br>其中dictht ht[2] 就是数据实际存储的hash map。dictht的结构如下：</p>
+<pre><code><span class="keyword">typedef</span> <span class="keyword">struct</span> dictht {
+    dictEntry **table;
+    <span class="keyword">unsigned</span> <span class="keyword">long</span> size;
+    <span class="keyword">unsigned</span> <span class="keyword">long</span> sizemask;
+    <span class="keyword">unsigned</span> <span class="keyword">long</span> used;
+} dictht;
+</code></pre><p>在dictht中，table就是存储map数据的广义表指针。map中的每一个entity（即key和value对）使用dictEntry来表示，dictEntry的结构如下：</p>
+<pre><code><span class="keyword">typedef</span> <span class="keyword">struct</span> dictEntry {
+    <span class="keyword">void</span> *key;
+    <span class="keyword">union</span> {
+        <span class="keyword">void</span> *val;
+        uint64_t u64;
+        int64_t s64;
+        <span class="built_in">double</span> d;
+    } v;
+    <span class="keyword">struct</span> dictEntry *next;
+} dictEntry;
+</code></pre><p>dictEntry表示map中的一个键值对，其中key是一个string，value可以是无符号64位（u64）整数，或者有符号64位整数（s64）或者是一个双精度浮点类型（d）当然还可以是String、map、list、set、zset（val）等类型，需要注意dictEntity指针类型的next可以看出，dictEntity会形成一个链表。</p>
+<p>redis的hashmap形式如下图：<br><img src="/blog/pic/redis/redis_table.png" alt="redis table"><br>从图中可以看出，redis中用于存储key和value的hashmap，实际上是一个纵向为一维数组，横向为链表结构的广义表。从下面的代码可以得出这个结论。</p>
+<pre><code>n.table = <span class="built_in">calloc</span>(realsize,<span class="keyword">sizeof</span>(dictEntry*));
+</code></pre><p>这样做的好处是，在查找某个key时，通过hash算法求出key值对应的数组下标，获取相同hash值的链表后，遍历链表获取对应key值即可。获取过程如下：</p>
+<pre><code><span class="keyword">static</span> dictEntry *dictFind(dict *ht, <span class="keyword">const</span> <span class="keyword">void</span> *key) {
+    dictEntry *he;
+    <span class="keyword">unsigned</span> <span class="keyword">int</span> h;
+
+    <span class="keyword">if</span> (ht-&gt;size == <span class="number">0</span>) <span class="keyword">return</span> <span class="literal">NULL</span>;
+    h = dictHashKey(ht, key) &amp; ht-&gt;sizemask;<span class="comment">//计算hash值，即table数组下标</span>
+    he = ht-&gt;table[h];<span class="comment">//he表示具有与请求key相同hash值的entity列表</span>
+    <span class="keyword">while</span>(he) {<span class="comment">//遍历这个列表，获取到与请求key相等的entity，并返回</span>
+        <span class="keyword">if</span> (dictCompareHashKeys(ht, key, he-&gt;key))
+            <span class="keyword">return</span> he;
+        he = he-&gt;next;
+    }
+    <span class="keyword">return</span> <span class="literal">NULL</span>;
+}
+</code></pre><h2 id="1-2-_渐进式rehash">1.2. 渐进式rehash</h2>
+<p>当hashtable中承载了过多的entity后，添加新key值时，冲突情况会越来越多，并且table中每个list长度会不断增长，此时查找key需要消耗更多时间。因此，当entity量足够大时，table需要rehash。如果使用传统hash算法，当redis中存在大量的entity时，将一个hash table的数据全部拷贝到新table中，将会消耗大量时间，因此，redis使用渐进式rehash。</p><p><br>在dict的数据结构中（<code>dictht ht[2];</code>）创建两个dictht，其中ht[0]表示旧的hashtable，ht[1]表示新hashtable。当ht[0]中有过多的entity后，redis为ht[1]分配一个足够大（一般是原table的两倍）的空间，新添加的entity都会放到ht[1]中，每当key查询时，如果ht[0]仍然有数据（通过<code>long rehashidx;</code>是否大于-1判断），就将ht[0]的一行数据（就是一个list列表）取出，对列表的每个entity重新计算，并放到ht[1]中。当系统继续运行一段时间后，所有数据都只在ht[1]中，此时ht[0]就可以释放空间（<code>long rehashidx;</code>被设置成-1），ht[0]空间释放后，将ht[0]指向ht[1]。例如，在dictFind中包含如下语句：<code>if (dictIsRehashing(d)) _dictRehashStep(d);</code>,可以看出，每次查找key时，都会判断是否在rehash（通过判断rehashidx），如果ht[0]中还有元素没有移过来，会调用_dictRehashStep.(参考dic.c中的<code>dictRehash</code>函数）。</p>
+
       
     </div>
     <footer class="article-footer">
@@ -115,162 +168,26 @@
     </footer>
   </div>
   
-</article>
-
-
+    
+<nav id="article-nav">
   
-    <article id="post-gc" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/blog/2014/07/10/gc/" class="article-date">
-  <time datetime="2014-07-10T14:37:01.000Z" itemprop="datePublished">Jul 10 2014</time>
-</a>
-    
-  <div class="article-category">
-    <a class="article-category-link" href="/blog/categories/算法/">算法</a>
-  </div>
-
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
   
-    <h1 itemprop="name">
-      <a class="article-title" href="/blog/2014/07/10/gc/">java 虚拟机垃圾回收原理</a>
-    </h1>
+    <a href="/blog/2014/07/10/gc/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">java 虚拟机垃圾回收原理</div>
+    </a>
   
+</nav>
 
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h1 id="1-_垃圾回收的基本概念">1. 垃圾回收的基本概念</h1>
-<p>垃圾回收器主要负责：</p>
-<ol>
-<li>为对象分配内存；</li>
-<li>确保可执行代码能够访问到的对象保留在内存中；</li>
-<li>无法被可执行代码访问到的对象占用的空间得到释放。<br>
-        
-          <p class="article-more-link">
-            <a href="/blog/2014/07/10/gc/#more">Read More</a>
-          </p>
-        
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="zsu6qcxrbgozrypa" class="article-share-link">Share</a>
-      
-        <a href="http://guanxinquan.github.io/blog/2014/07/10/gc/#disqus_thread" class="article-comment-link">Comments</a>
-      
-      
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/gc/">gc</a></li></ul>
-
-    </footer>
-  </div>
   
 </article>
 
 
-  
-    <article id="post-lucene_FST_parser" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/blog/2014/06/17/lucene_FST_parser/" class="article-date">
-  <time datetime="2014-06-17T09:39:40.000Z" itemprop="datePublished">Jun 17 2014</time>
-</a>
-    
-  <div class="article-category">
-    <a class="article-category-link" href="/blog/categories/算法/">算法</a>
+<section id="comments">
+  <div id="disqus_thread">
+    <noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
   </div>
-
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/blog/2014/06/17/lucene_FST_parser/">lucene中的FST算法分析</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h1 id="前言">前言</h1>
-<p>FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。</p>
-<p>在FST构建过程中，term的文本信息(按照字典顺序排序）作为FST的input，term的存储位置（或者次序）作为FST的output，<input,output>二元组将以FST的形式存储在内存中（<strong>请注意input和output都是有序的</strong>）。检索时，根据input，通过计算FST中的路径上的权值信息，获取到output数据，最终在磁盘上定位term的其它附加信息。同时FST还能够快速的判断一个term是否在lucene中。<br>
-        
-          <p class="article-more-link">
-            <a href="/blog/2014/06/17/lucene_FST_parser/#more">Read More</a>
-          </p>
-        
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="5d08matmxgw9y5p7" class="article-share-link">Share</a>
-      
-        <a href="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/#disqus_thread" class="article-comment-link">Comments</a>
-      
-      
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/fst/">fst</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-firstblog" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/blog/2014/06/17/firstblog/" class="article-date">
-  <time datetime="2014-06-17T06:58:01.000Z" itemprop="datePublished">Jun 17 2014</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/blog/2014/06/17/firstblog/">青春纪念</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>今天开始在这里写博客了，留个影，纪念一下。</p>
-<p>
-        
-          <p class="article-more-link">
-            <a href="/blog/2014/06/17/firstblog/#more">Read More</a>
-          </p>
-        
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/firstblog/" data-id="lff3iehpayv90ebe" class="article-share-link">Share</a>
-      
-        <a href="http://guanxinquan.github.io/blog/2014/06/17/firstblog/#disqus_thread" class="article-comment-link">Comments</a>
-      
-      
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/生活/">生活</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-  
+</section>
 </section>
         
           <aside id="sidebar">
@@ -362,11 +279,13 @@
 <script>
   var disqus_shortname = 'httpguanxinquangithubio';
   
+  var disqus_url = 'http://guanxinquan.github.io/blog/2014/10/01/redis/';
+  
   (function(){
     var dsq = document.createElement('script');
     dsq.type = 'text/javascript';
     dsq.async = true;
-    dsq.src = '//go.disqus.com/count.js';
+    dsq.src = '//go.disqus.com/embed.js';
     (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
   })();
 </script>
