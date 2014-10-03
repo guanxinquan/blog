@@ -195,11 +195,170 @@ typedef struct dict {
 </code></pre><p>可以看出<code>(he)-&gt;v.s64</code>使用的是dict定义中union的s64而不是val，这也是dic为什么使用union的原因。<br><br>此外，如果没有为key设置过期时间，那么会节省很多空间。</p>
 <h2 id="1-3-_渐进式rehash">1.3. 渐进式rehash</h2>
 <p>当hashtable中承载了过多的entity后，添加新key值时，冲突情况会越来越多，并且table中每个list长度会不断增长，此时查找key需要消耗更多时间。因此，当entity量足够大时，table需要rehash。如果使用传统hash算法，当redis中存在大量的entity时，将一个hash table的数据全部拷贝到新table中，将会消耗大量时间，因此，redis使用渐进式rehash。</p><p><br>在dict的数据结构中（<code>dictht ht[2];</code>）创建两个dictht，其中ht[0]表示旧的hashtable，ht[1]表示新hashtable。当ht[0]中有过多的entity后，redis为ht[1]分配一个足够大（一般是原table的两倍）的空间，新添加的entity都会放到ht[1]中，每当key查询时，如果ht[0]仍然有数据（通过<code>long rehashidx;</code>是否大于-1判断），就将ht[0]的一行数据（就是一个list列表）取出，对列表的每个entity重新计算，并放到ht[1]中。当系统继续运行一段时间后，所有数据都只在ht[1]中，此时ht[0]就可以释放空间（<code>long rehashidx;</code>被设置成-1），ht[0]空间释放后，将ht[0]指向ht[1]。例如，在dictFind中包含如下语句：<code>if (dictIsRehashing(d)) _dictRehashStep(d);</code>,可以看出，每次查找key时，都会判断是否在rehash（通过判断rehashidx），如果ht[0]中还有元素没有移过来，会调用_dictRehashStep.(参考dic.c中的<code>dictRehash</code>函数）。</p>
+<h1 id="2-_redis_list">2. redis list</h1>
+<p>redis list使用了两种存储方式，分别是双向链表（REDIS_ENCODING_LINKEDLIST）和zip list（REDIS_ENCODING_ZIPLIST）</p>
+<h2 id="2-1_REDIS_ENCODING_LINKEDLIST">2.1 REDIS_ENCODING_LINKEDLIST</h2>
+<p>redis中双向列表的定义如下：</p>
+<pre><code><span class="keyword">typedef</span> <span class="keyword">struct</span> listNode {
+    <span class="keyword">struct</span> listNode *prev;
+    <span class="keyword">struct</span> listNode *next;
+    <span class="keyword">void</span> *value;
+} listNode;
+
+<span class="keyword">typedef</span> <span class="keyword">struct</span> <span class="built_in">list</span> {
+    listNode *head;
+    listNode *tail;
+    <span class="keyword">void</span> *(*dup)(<span class="keyword">void</span> *ptr);
+    <span class="keyword">void</span> (*<span class="built_in">free</span>)(<span class="keyword">void</span> *ptr);
+    <span class="keyword">int</span> (*match)(<span class="keyword">void</span> *ptr, <span class="keyword">void</span> *key);
+    <span class="keyword">unsigned</span> <span class="keyword">long</span> len;
+} <span class="built_in">list</span>;
+</code></pre><h2 id="2-2_REDIS_ENCODING_ZIPLIST">2.2 REDIS_ENCODING_ZIPLIST</h2>
+<p>zip list是一种压缩格式，整个list编码成一个string，list的编码格式如下：</p>
+<pre><code><span class="tag">&lt;<span class="title">zlbytes</span>&gt;</span><span class="tag">&lt;<span class="title">zltail</span>&gt;</span><span class="tag">&lt;<span class="title">zllen</span>&gt;</span><span class="tag">&lt;<span class="title">entry</span>&gt;</span><span class="tag">&lt;<span class="title">entry</span>&gt;</span><span class="tag">&lt;<span class="title">zlend</span>&gt;</span>
+</code></pre><p>zlbytes： 4bytes 用于表示整个zip list包含多少byte数据。<br><br>zltail：4bytes 用于表示列表最后一个元素与列表起始元素之间的偏移量，方便逆序访问list快速定位list的最后的entity。<br><br>zllen: 2bytes 用于表示zip list中entity的数量。<br><br>entry：list中单个元素的数据信息。<br><br>zlend：1byte 永远是255，表示list的末尾。<br><br>list中的每个entity由如下格式组成：</p>
+<pre><code><span class="subst">&lt;</span>length<span class="attribute">-prev</span><span class="attribute">-entry</span><span class="subst">&gt;&lt;</span>special<span class="attribute">-flag</span><span class="subst">&gt;&lt;</span>raw<span class="attribute">-bytes</span><span class="attribute">-of</span><span class="attribute">-entry</span><span class="subst">&gt;</span>
+</code></pre><p>length-prev-entry：表示当前entity的前一个entity的长度，在反向遍历时，用于快速定位前驱元素的位置；<br><br>special-flag：entity数据实际存储的类型（可能是不同长度string的编码、或者是不同长度整形的编码等，详见Redis RDB File Format）<br>raw-bytes-of-entry:entity 的实际存储的数据，具体类型有special-flag决定。<br><br><strong>注意:zltail元素的用法，根据entity的格式，很容易找到某个entity的前驱和后继元素（前驱通过length-prev-entry定位，后继就是当前元素解析后那个位置开始）对于逆序访问，需要定位最后一个entity的起始位置，因此，zltail用于快速定位最后一个元素的起始位置（如果zltail不存在，即使知道最后元素的结尾在哪里，但是entity是变长的，也无法推断出最后一个元素的起始位置）</strong><br></p>
+<p>创建一个空zip list的源码如下：</p>
+<pre><code><span class="preprocessor">#define ZIPLIST_HEADER_SIZE     (sizeof(uint32_t)*2+sizeof(uint16_t))</span>
+<span class="keyword">unsigned</span> <span class="keyword">char</span> *ziplistNew(<span class="keyword">void</span>) {
+    <span class="keyword">unsigned</span> <span class="keyword">int</span> bytes = ZIPLIST_HEADER_SIZE+<span class="number">1</span>;<span class="comment">//32+32+16+1 = zlbytes+zltail+zllen+zlend</span>
+    <span class="keyword">unsigned</span> <span class="keyword">char</span> *zl = zmalloc(bytes);
+    ZIPLIST_BYTES(zl) = intrev32ifbe(bytes);<span class="comment">//redis使用小端对齐</span>
+    ZIPLIST_TAIL_OFFSET(zl) = intrev32ifbe(ZIPLIST_HEADER_SIZE);
+    ZIPLIST_LENGTH(zl) = <span class="number">0</span>;
+    zl[bytes-<span class="number">1</span>] = ZIP_END;
+    <span class="keyword">return</span> zl;
+}
+</code></pre><p>将一个元素添加到list中：</p>
+<pre><code><span class="comment">/* Insert item at "p". */</span>
+<span class="keyword">static</span> <span class="keyword">unsigned</span> <span class="keyword">char</span> *__ziplistInsert(<span class="keyword">unsigned</span> <span class="keyword">char</span> *zl, <span class="keyword">unsigned</span> <span class="keyword">char</span> *p, <span class="keyword">unsigned</span> <span class="keyword">char</span> *s, <span class="keyword">unsigned</span> <span class="keyword">int</span> slen) {
+    size_t curlen = intrev32ifbe(ZIPLIST_BYTES(zl)), reqlen;
+    <span class="keyword">unsigned</span> <span class="keyword">int</span> prevlensize, prevlen = <span class="number">0</span>;
+    size_t offset;
+    <span class="keyword">int</span> nextdiff = <span class="number">0</span>;
+    <span class="keyword">unsigned</span> <span class="keyword">char</span> encoding = <span class="number">0</span>;
+    <span class="keyword">long</span> <span class="keyword">long</span> value = <span class="number">123456789</span>; <span class="comment">/* initialized to avoid warning. Using a value
+                                    that is easy to see if for some reason
+                                    we use it uninitialized. */</span>
+    zlentry tail;
+
+    <span class="comment">/* Find out prevlen for the entry that is inserted. */</span>
+    <span class="keyword">if</span> (p[<span class="number">0</span>] != ZIP_END) {<span class="comment">//在list的头部插入</span>
+        ZIP_DECODE_PREVLEN(p, prevlensize, prevlen);
+    } <span class="keyword">else</span> {<span class="comment">//尾部插入</span>
+        <span class="keyword">unsigned</span> <span class="keyword">char</span> *ptail = ZIPLIST_ENTRY_TAIL(zl);
+        <span class="keyword">if</span> (ptail[<span class="number">0</span>] != ZIP_END) {
+            prevlen = zipRawEntryLength(ptail);
+        }
+    }
+
+    <span class="comment">/* See if the entry can be encoded */</span>
+    <span class="keyword">if</span> (zipTryEncoding(s,slen,&amp;value,&amp;encoding)) {<span class="comment">//能转换为整形的，就转换后存储</span>
+        <span class="comment">/* 'encoding' is set to the appropriate integer encoding */</span>
+        reqlen = zipIntSize(encoding);
+    } <span class="keyword">else</span> {<span class="comment">//不能转换的，使用string存储</span>
+        <span class="comment">/* 'encoding' is untouched, however zipEncodeLength will use the
+         * string length to figure out how to encode it. */</span>
+        reqlen = slen;
+    }
+    <span class="comment">/* We need space for both the length of the previous entry and
+     * the length of the payload. */</span>
+    reqlen += zipPrevEncodeLength(<span class="literal">NULL</span>,prevlen);
+    reqlen += zipEncodeLength(<span class="literal">NULL</span>,encoding,slen);
+
+    <span class="comment">/* When the insert position is not equal to the tail, we need to
+     * make sure that the next entry can hold this entry's length in
+     * its prevlen field. */</span>
+    nextdiff = (p[<span class="number">0</span>] != ZIP_END) ? zipPrevLenByteDiff(p,reqlen) : <span class="number">0</span>;
+
+    <span class="comment">/* Store offset because a realloc may change the address of zl. */</span>
+    offset = p-zl;
+    zl = ziplistResize(zl,curlen+reqlen+nextdiff);
+    p = zl+offset;
+
+    <span class="comment">/* Apply memory move when necessary and update tail offset. */</span>
+    <span class="keyword">if</span> (p[<span class="number">0</span>] != ZIP_END) {<span class="comment">//在头部插入，需要移动元素</span>
+        <span class="comment">/* Subtract one because of the ZIP_END bytes */</span>
+        memmove(p+reqlen,p-nextdiff,curlen-offset-<span class="number">1</span>+nextdiff);
+
+        <span class="comment">/* Encode this entry's raw length in the next entry. */</span>
+        zipPrevEncodeLength(p+reqlen,reqlen);
+
+        <span class="comment">/* Update offset for tail */</span>
+        ZIPLIST_TAIL_OFFSET(zl) =
+            intrev32ifbe(intrev32ifbe(ZIPLIST_TAIL_OFFSET(zl))+reqlen);
+
+        <span class="comment">/* When the tail contains more than one entry, we need to take
+         * "nextdiff" in account as well. Otherwise, a change in the
+         * size of prevlen doesn't have an effect on the *tail* offset. */</span>
+        tail = zipEntry(p+reqlen);
+        <span class="keyword">if</span> (p[reqlen+tail<span class="variable">.headersize</span>+tail<span class="variable">.len</span>] != ZIP_END) {
+            ZIPLIST_TAIL_OFFSET(zl) =
+                intrev32ifbe(intrev32ifbe(ZIPLIST_TAIL_OFFSET(zl))+nextdiff);
+        }
+    } <span class="keyword">else</span> {
+        <span class="comment">/* This element will be the new tail. */</span>
+        ZIPLIST_TAIL_OFFSET(zl) = intrev32ifbe(p-zl);
+    }
+
+    <span class="comment">/* When nextdiff != 0, the raw length of the next entry has changed, so
+     * we need to cascade the update throughout the ziplist */</span>
+    <span class="keyword">if</span> (nextdiff != <span class="number">0</span>) {
+        offset = p-zl;
+        zl = __ziplistCascadeUpdate(zl,p+reqlen);
+        p = zl+offset;
+    }
+
+    <span class="comment">/* Write the entry */</span>
+    p += zipPrevEncodeLength(p,prevlen);
+    p += zipEncodeLength(p,encoding,slen);
+    <span class="keyword">if</span> (ZIP_IS_STR(encoding)) {
+        memcpy(p,s,slen);
+    } <span class="keyword">else</span> {
+        zipSaveInteger(p,value,encoding);
+    }
+    ZIPLIST_INCR_LENGTH(zl,<span class="number">1</span>);
+    <span class="keyword">return</span> zl;
+}
+</code></pre><p>在存储过程中，能转换成整型的value会尽量转换成数字存储，从而节省空间：</p>
+<pre><code><span class="comment">/* Check if string pointed to by 'entry' can be encoded as an integer.
+ * Stores the integer value in 'v' and its encoding in 'encoding'. */</span>
+<span class="keyword">static</span> <span class="keyword">int</span> zipTryEncoding(unsigned <span class="keyword">char</span> *entry, unsigned <span class="keyword">int</span> entrylen, <span class="keyword">long</span> <span class="keyword">long</span> *v, unsigned <span class="keyword">char</span> *encoding) {
+    <span class="keyword">long</span> <span class="keyword">long</span> <span class="keyword">value</span>;
+
+    <span class="keyword">if</span> (entrylen &gt;= <span class="number">32</span> || entrylen == <span class="number">0</span>) <span class="keyword">return</span> <span class="number">0</span>;
+    <span class="keyword">if</span> (string2ll((<span class="keyword">char</span>*)entry,entrylen,&amp;<span class="keyword">value</span>)) {
+        <span class="comment">/* Great, the string can be encoded. Check what's the smallest
+         * of our encoding types that can hold this value. */</span>
+        <span class="keyword">if</span> (<span class="keyword">value</span> &gt;= <span class="number">0</span> &amp;&amp; <span class="keyword">value</span> &lt;= <span class="number">12</span>) {
+            *encoding = ZIP_INT_IMM_MIN+<span class="keyword">value</span>;
+        } <span class="keyword">else</span> <span class="keyword">if</span> (<span class="keyword">value</span> &gt;= INT8_MIN &amp;&amp; <span class="keyword">value</span> &lt;= INT8_MAX) {
+            *encoding = ZIP_INT_8B;
+        } <span class="keyword">else</span> <span class="keyword">if</span> (<span class="keyword">value</span> &gt;= INT16_MIN &amp;&amp; <span class="keyword">value</span> &lt;= INT16_MAX) {
+            *encoding = ZIP_INT_16B;
+        } <span class="keyword">else</span> <span class="keyword">if</span> (<span class="keyword">value</span> &gt;= INT24_MIN &amp;&amp; <span class="keyword">value</span> &lt;= INT24_MAX) {
+            *encoding = ZIP_INT_24B;
+        } <span class="keyword">else</span> <span class="keyword">if</span> (<span class="keyword">value</span> &gt;= INT32_MIN &amp;&amp; <span class="keyword">value</span> &lt;= INT32_MAX) {
+            *encoding = ZIP_INT_32B;
+        } <span class="keyword">else</span> {
+            *encoding = ZIP_INT_64B;
+        }
+        *v = <span class="keyword">value</span>;
+        <span class="keyword">return</span> <span class="number">1</span>;
+    }
+    <span class="keyword">return</span> <span class="number">0</span>;
+}
+</code></pre><p>从上面的过程可以看出，使用ziplist存储较小的数据会很高效。</p>
+<h2 id="2-3_list_和_ziplist转换">2.3 list 和 ziplist转换</h2>
+<p>ziplist在存储空间上，比list节省的多，这种压缩格式对于entity value值比较小（例如是int类型、或者较短的string类型）存储效率会非常高，例如，存储一个32位的整数list，每个元素占用空间（length-prev-entry+special-flag+raw-bytes-of-entry = 2+1+4 = 7bytes）比list类型占用的空间（prev+next+value = 4+4+4 = 12bytes）高效的多。当某个list的单个元素很小时适合使用ziplist存储列表，可以通过<br><code>list-max-ziplist-value</code>参数指定使用ziplist存储的元素上限。默认为64.<br><br>另一方面，由于每次对ziplist的修改，都会导致整个string的resize，当entity的数量较多时，显然使用ziplist是不适当的，会消耗大量的cpu时间并且降低了操作的相应速度，可以通过<code>list-max-ziplist-entries</code>参数调节使用ziplist的最大entity数量，默认为512.<br></p>
+<h1 id="参考资料：">参考资料：</h1>
+<p>Redis RDB File Format：<a href="https://github.com/sripathikrishnan/redis-rdb-tools/wiki/Redis-RDB-Dump-File-Format" target="_blank" rel="external">https://github.com/sripathikrishnan/redis-rdb-tools/wiki/Redis-RDB-Dump-File-Format</a></p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/10/01/redis/" data-id="n1wu3jnixdu9vhun" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/10/01/redis/" data-id="mehieosmgxvx8dcf" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/10/01/redis/#disqus_thread" class="article-comment-link">Comments</a>
       
