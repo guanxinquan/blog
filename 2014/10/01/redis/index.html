@@ -107,7 +107,7 @@ typedef struct dict {
     <div class="article-entry" itemprop="articleBody">
       
         <h1 id="1-_Redis_key和value的存储形式">1. Redis key和value的存储形式</h1>
-<h1 id="1-1-_基本数据结构">1.1. 基本数据结构</h1>
+<h2 id="1-1-_基本数据结构">1.1. 基本数据结构</h2>
 <p>redis中使用hashmap存储key和对应的value。hashmap的定义如下：</p>
 <pre><code>typedef <span class="keyword">struct</span> dict {
     dictType *<span class="class"><span class="keyword">type</span>;</span>
@@ -352,13 +352,128 @@ typedef struct dict {
 </code></pre><p>从上面的过程可以看出，使用ziplist存储较小的数据会很高效。</p>
 <h2 id="2-3_list_和_ziplist转换">2.3 list 和 ziplist转换</h2>
 <p>ziplist在存储空间上，比list节省的多，这种压缩格式对于entity value值比较小（例如是int类型、或者较短的string类型）存储效率会非常高，例如，存储一个32位的整数list，每个元素占用空间（length-prev-entry+special-flag+raw-bytes-of-entry = 2+1+4 = 7bytes）比list类型占用的空间（prev+next+value = 4+4+4 = 12bytes）高效的多。当某个list的单个元素很小时适合使用ziplist存储列表，可以通过<br><code>list-max-ziplist-value</code>参数指定使用ziplist存储的元素上限。默认为64.<br><br>另一方面，由于每次对ziplist的修改，都会导致整个string的resize，当entity的数量较多时，显然使用ziplist是不适当的，会消耗大量的cpu时间并且降低了操作的相应速度，可以通过<code>list-max-ziplist-entries</code>参数调节使用ziplist的最大entity数量，默认为512.<br></p>
-<h1 id="参考资料：">参考资料：</h1>
+<h2 id="2-4_list的block实现">2.4 list的block实现</h2>
+<p>redis中list提供block操作，简单说，请求获取list中元素时，如果list中尚未有可返回的元素，请求即被阻塞，直至有其它请求向list中添加元素为止。<br><br>redis中list有三种block操作，分别是blpop、brpop、brpoplpush。<br><br>redisClient中有一个blockingState类型的属性，用于记录当前请求等待哪些list keys，blockingState定义如下：</p>
+<pre><code>typedef struct blockingState {
+    dict *keys;             /* The keys we are waiting <span class="keyword">to</span> terminate a blocking
+                             * operation such <span class="keyword">as</span> BLPOP. Otherwise NULL. */
+    time_t <span class="keyword">timeout</span>;         /* Blocking operation <span class="keyword">timeout</span>. If UNIX current <span class="property">time</span>
+                             * <span class="keyword">is</span> &gt;= <span class="keyword">timeout</span> <span class="keyword">then</span> <span class="keyword">the</span> operation timed out. */
+    robj *target;           /* The key <span class="keyword">that</span> should receive <span class="keyword">the</span> element,
+                             * <span class="keyword">for</span> BRPOPLPUSH. */
+} blockingState;
+</code></pre><p>此外，redisDB中有两个dict类型的属性，blocking_keys用于记录阻塞的key和clients的映射关系(注意，这里的clients是一个list，很多个client可以在同一个key上阻塞)，ready_keys用于记录收到push请求的blocking_keys（ready_keys实际相当于一个set，其只记录了key，所有的val都是null）。<br><br>在server层面上，也有一个ready_keys,类型却为list，其中每个元素定义如下：</p>
+<pre><code><span class="keyword">typedef</span> <span class="keyword">struct</span> readyList {
+    redisDb *db;<span class="comment">//哪个数据库</span>
+    robj *key;<span class="comment">//对应的key</span>
+} readyList;
+</code></pre><p>从上述定义可以看出，一个server实际上是由多个db组成，而server的ready_keys记录了key和对应db的关系。<strong>注意，不同的db可能有相同的key，因此server层面的ready_keys没有选用hash结构</strong></p>
+<p>下面以blpop为例，说明算法流程：<br></p>
+<ol>
+<li>请求blpop，并且key对应的list非空，blpop内部直接调用lpop，返回结果，此时，调用blpop与lpop没有区别；</li>
+<li>blpop调用时，请求的key不存在或者key对应的list为空，此时request需要block。redis清理掉请求的接收数据标记，以保证在block过程中，不会在这个链接中读取数据。redis将请求的client添加到db-&gt;blocking_keys队列中。</li>
+<li>当某个block的key接收到push请求后，会被放入ready_keys中，并且在当前指令、script、或者multi/exec block被执行时，redis会将list中所有的元素，依次赋值给blocking_keys对应key队列中的client。</li>
+</ol>
+<p>添加block key的源码片段（<code>函数blockForKeys</code>）：</p>
+<pre><code><span class="keyword">for</span> (j = <span class="number">0</span>; j &lt; numkeys<span class="javadoc">/**参数中可以订阅多个keys**/</span>; j++) {
+    <span class="comment">/* If the key already exists in the dict ignore it. */</span>
+    <span class="keyword">if</span> (dictAdd(c-&gt;bpop.keys,keys[j],NULL) != DICT_OK) <span class="keyword">continue</span>;
+
+    <span class="comment">/* And in the other "side", to map keys -&gt; clients */</span>
+    de = dictFind(c-&gt;db-&gt;blocking_keys,keys[j]);
+    <span class="keyword">if</span> (de == NULL) {
+        <span class="keyword">int</span> retval;
+        <span class="comment">/* For every key we take a list of clients blocked for it */</span>
+        l = listCreate();
+        retval = dictAdd(c-&gt;db-&gt;blocking_keys,keys[j],l);
+    } <span class="keyword">else</span> {
+        l = dictGetVal(de);<span class="comment">//获取阻塞key对应的client列表</span>
+    }
+    listAddNodeTail(l,c);<span class="comment">//将当前阻塞的client，添加到列表的最后</span>
+}
+</code></pre><p>调用push命令后，向ready_keys中添加元素(<code>函数signalListAsReady</code>)</p>
+<pre><code><span class="comment">/* No clients blocking for this key? No need to queue it. */</span>
+<span class="keyword">if</span> (dictFind(c<span class="subst">-&gt;</span>db<span class="subst">-&gt;</span>blocking_keys,key) <span class="subst">==</span> <span class="built_in">NULL</span>) <span class="keyword">return</span>;
+
+<span class="comment">/* Key was already signaled? No need to queue it again. */</span>
+<span class="keyword">if</span> (dictFind(c<span class="subst">-&gt;</span>db<span class="subst">-&gt;</span>ready_keys,key) <span class="subst">!=</span> <span class="built_in">NULL</span>) <span class="keyword">return</span>;
+
+<span class="comment">/* Ok, we need to queue this key into server.ready_keys. */</span>
+rl <span class="subst">=</span> zmalloc(sizeof(<span class="subst">*</span>rl));
+rl<span class="subst">-&gt;</span>key <span class="subst">=</span> key;
+rl<span class="subst">-&gt;</span>db <span class="subst">=</span> c<span class="subst">-&gt;</span>db;
+listAddNodeTail(server<span class="built_in">.</span>ready_keys,rl);<span class="comment">//先添加到server的ready_key中</span>
+redisAssert(dictAdd(c<span class="subst">-&gt;</span>db<span class="subst">-&gt;</span>ready_keys,key,<span class="built_in">NULL</span>) <span class="subst">==</span> DICT_OK);<span class="comment">//再添加到db的ready_keys中</span>
+</code></pre><p>从上面的代码中可以看出，db-&gt;ready_keys只是用作过滤某个key是否已经添加到server-&gt;ready_keys中，由于server-&gt;ready_keys是一个list，如果通过遍历list判断某个key是否在server-&gt;ready_keys中，要消耗更多的时间，因此,db-&gt;ready_keys相当一个set，过滤那些已经添加到server-&gt;ready_keys中的元素。<br></p>
+<p>最后，当有命令被执行时，调用释放block</p>
+<pre><code><span class="comment">/* Point server.ready_keys to a fresh list and save the current one
+    * locally. This way as we run the old list we are free to call
+    * signalListAsReady() that may push new elements in server.ready_keys
+    * when handling clients blocked into BRPOPLPUSH. */</span>
+l <span class="subst">=</span> server<span class="built_in">.</span>ready_keys;
+server<span class="built_in">.</span>ready_keys <span class="subst">=</span> listCreate();
+
+<span class="keyword">while</span>(listLength(l) <span class="subst">!=</span> <span class="number">0</span>) {
+    listNode <span class="subst">*</span>ln <span class="subst">=</span> listFirst(l);
+    readyList <span class="subst">*</span>rl <span class="subst">=</span> ln<span class="subst">-&gt;</span>value;
+
+    <span class="comment">/* First of all remove this key from db-&gt;ready_keys so that
+     * we can safely call signalListAsReady() against this key. */</span>
+    dictDelete(rl<span class="subst">-&gt;</span>db<span class="subst">-&gt;</span>ready_keys,rl<span class="subst">-&gt;</span>key);<span class="comment">//保证处理key时，也可以添加block_ready</span>
+
+    <span class="comment">/* If the key exists and it's a list, serve blocked clients
+    * with data. */</span>
+    robj <span class="subst">*</span>o <span class="subst">=</span> lookupKeyWrite(rl<span class="subst">-&gt;</span>db,rl<span class="subst">-&gt;</span>key);
+    <span class="keyword">if</span> (o <span class="subst">!=</span> <span class="built_in">NULL</span> <span class="subst">&amp;&amp;</span> o<span class="subst">-&gt;</span><span class="keyword">type</span> <span class="subst">==</span> REDIS_LIST) {
+        dictEntry <span class="subst">*</span>de;
+
+        <span class="comment">/* We serve clients in the same order they blocked for
+          * this key, from the first blocked to the last. */</span>
+        de <span class="subst">=</span> dictFind(rl<span class="subst">-&gt;</span>db<span class="subst">-&gt;</span>blocking_keys,rl<span class="subst">-&gt;</span>key);
+        <span class="keyword">if</span> (de) {
+            <span class="built_in">list</span> <span class="subst">*</span>clients <span class="subst">=</span> dictGetVal(de);<span class="comment">//获取到client</span>
+            int numclients <span class="subst">=</span> listLength(clients);
+
+               <span class="keyword">while</span>(numclients<span class="subst">--</span>) {
+                listNode <span class="subst">*</span>clientnode <span class="subst">=</span> listFirst(clients);
+                redisClient <span class="subst">*</span>receiver <span class="subst">=</span> clientnode<span class="subst">-&gt;</span>value;
+                robj <span class="subst">*</span>dstkey <span class="subst">=</span> receiver<span class="subst">-&gt;</span>bpop<span class="built_in">.</span>target;
+                int <span class="keyword">where</span> <span class="subst">=</span> (receiver<span class="subst">-&gt;</span>lastcmd <span class="subst">&amp;&amp;</span>
+                             receiver<span class="subst">-&gt;</span>lastcmd<span class="subst">-&gt;</span>proc <span class="subst">==</span> blpopCommand) <span class="subst">?</span>
+                            REDIS_HEAD : REDIS_TAIL;
+                robj <span class="subst">*</span>value <span class="subst">=</span> listTypePop(o,<span class="keyword">where</span>);
+
+                <span class="keyword">if</span> (value) {
+                    <span class="comment">/* Protect receiver-&gt;bpop.target, that will be
+                     * freed by the next unblockClientWaitingData()
+                     * call. */</span>
+                    unblockClientWaitingData(receiver);<span class="comment">//client现在可以继续接受输入数据</span>
+
+                    <span class="keyword">if</span> (serveClientBlockedOnList(receiver,
+                        rl<span class="subst">-&gt;</span>key,dstkey,rl<span class="subst">-&gt;</span>db,value,
+                        <span class="keyword">where</span>) <span class="subst">==</span> REDIS_ERR)<span class="comment">//将需要的数据返回给客户端</span>
+                    {
+                        <span class="comment">/* If we failed serving the client we need
+                         * to also undo the POP operation. */</span>
+                            listTypePush(o,value,<span class="keyword">where</span>);
+                    }
+                } <span class="keyword">else</span> {
+                    break;
+                }
+    }
+}
+
+<span class="keyword">if</span> (listTypeLength(o) <span class="subst">==</span> <span class="number">0</span>) dbDelete(rl<span class="subst">-&gt;</span>db,rl<span class="subst">-&gt;</span>key);
+<span class="comment">/* We don't call signalModifiedKey() as it was already called
+ * when an element was pushed on the list. */</span>
+}
+</code></pre><h1 id="参考资料：">参考资料：</h1>
 <p>Redis RDB File Format：<a href="https://github.com/sripathikrishnan/redis-rdb-tools/wiki/Redis-RDB-Dump-File-Format" target="_blank" rel="external">https://github.com/sripathikrishnan/redis-rdb-tools/wiki/Redis-RDB-Dump-File-Format</a></p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/10/01/redis/" data-id="mehieosmgxvx8dcf" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/10/01/redis/" data-id="ffqk1adsmjw9lvwe" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/10/01/redis/#disqus_thread" class="article-comment-link">Comments</a>
       
