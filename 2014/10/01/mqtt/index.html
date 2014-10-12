@@ -3,17 +3,45 @@
 <head>
   <meta charset="utf-8">
   
-  <title>MR.GUAN</title>
+  <title>mqtt协议 | MR.GUAN</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="just for fun">
-<meta property="og:type" content="website">
-<meta property="og:title" content="MR.GUAN">
-<meta property="og:url" content="http://guanxinquan.github.io/blog/blog/">
+  <meta name="description" content="2. 消息格式
+所有mqtt消息都有固定头部（fix header）。一部分mqtt消息包含可变头部（variable header）和消息负载（payload）。下面的部分组要介绍mqtt消息的组成部分。
+2.1 固定头部（fixed header）
+所有mqtt消息都包含有fixed header，fixed header定义如下：
+
+
+byte1 包含Message Type和Flags（D">
+<meta property="og:type" content="article">
+<meta property="og:title" content="mqtt协议">
+<meta property="og:url" content="http://guanxinquan.github.io/blog/blog/2014/10/01/mqtt/">
 <meta property="og:site_name" content="MR.GUAN">
-<meta property="og:description" content="just for fun">
+<meta property="og:description" content="2. 消息格式
+所有mqtt消息都有固定头部（fix header）。一部分mqtt消息包含可变头部（variable header）和消息负载（payload）。下面的部分组要介绍mqtt消息的组成部分。
+2.1 固定头部（fixed header）
+所有mqtt消息都包含有fixed header，fixed header定义如下：
+
+
+byte1 包含Message Type和Flags（D">
+<meta property="og:image" content="/blog/pic/mqtt/fix_header.png">
+<meta property="og:image" content="/blog/pic/mqtt/message_type_1.png">
+<meta property="og:image" content="/blog/pic/mqtt/message_type_2.png">
+<meta property="og:image" content="/blog/pic/mqtt/flags.png">
+<meta property="og:image" content="/blog/pic/mqtt/qos.png">
+<meta property="og:image" content="/blog/pic/mqtt/remaining_length.png">
+<meta property="og:image" content="/blog/pic/mqtt/protocol_version.png">
+<meta property="og:image" content="/blog/pic/mqtt/clean_session.png">
+<meta property="og:image" content="/blog/pic/mqtt/keep_alive.png">
+<meta property="og:image" content="/blog/pic/mqtt/return_code.png">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="MR.GUAN">
-<meta name="twitter:description" content="just for fun">
+<meta name="twitter:title" content="mqtt协议">
+<meta name="twitter:description" content="2. 消息格式
+所有mqtt消息都有固定头部（fix header）。一部分mqtt消息包含可变头部（variable header）和消息负载（payload）。下面的部分组要介绍mqtt消息的组成部分。
+2.1 固定头部（fixed header）
+所有mqtt消息都包含有fixed header，fixed header定义如下：
+
+
+byte1 包含Message Type和Flags（D">
   
     <link rel="alternative" href="/atom.xml" title="MR.GUAN" type="application/atom+xml">
   
@@ -58,9 +86,7 @@
   </div>
 </header>
       <div class="outer">
-        <section id="main">
-  
-    <article id="post-mqtt" class="article article-type-post" itemscope itemprop="blogPost">
+        <section id="main"><article id="post-mqtt" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/blog/2014/10/01/mqtt/" class="article-date">
   <time datetime="2014-10-01T04:45:00.000Z" itemprop="datePublished">Oct 1 2014</time>
@@ -77,8 +103,8 @@
       <header class="article-header">
         
   
-    <h1 itemprop="name">
-      <a class="article-title" href="/blog/2014/10/01/mqtt/">mqtt协议</a>
+    <h1 class="article-title" itemprop="name">
+      mqtt协议
     </h1>
   
 
@@ -153,221 +179,26 @@ multiplier *= <span class="number">128</span>
     </footer>
   </div>
   
-</article>
-
-
+    
+<nav id="article-nav">
   
-    <article id="post-redis" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/blog/2014/10/01/redis/" class="article-date">
-  <time datetime="2014-10-01T04:45:00.000Z" itemprop="datePublished">Oct 1 2014</time>
-</a>
-    
-  <div class="article-category">
-    <a class="article-category-link" href="/blog/categories/算法/">算法</a>
-  </div>
-
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
   
-    <h1 itemprop="name">
-      <a class="article-title" href="/blog/2014/10/01/redis/">redis 算法研究</a>
-    </h1>
+    <a href="/blog/2014/10/01/redis/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">redis 算法研究</div>
+    </a>
   
+</nav>
 
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h1 id="1-_Redis_key和value的存储形式">1. Redis key和value的存储形式</h1>
-<h2 id="1-1-_基本数据结构">1.1. 基本数据结构</h2>
-<p>redis中使用hashmap存储key和对应的value。hashmap的定义如下：</p>
-<pre><code>typedef <span class="keyword">struct</span> dict {
-    dictType *<span class="class"><span class="keyword">type</span>;</span>
-    <span class="keyword">void</span> *privdata;
-    dictht ht[<span class="number">2</span>];
-    long rehashidx; /* rehashing not <span class="keyword">in</span> progress <span class="keyword">if</span> rehashidx == -<span class="number">1</span> */
-    int iterators; /* number <span class="keyword">of</span> iterators currently running */
-} dict; 
-</code></pre><p>
-        
-          <p class="article-more-link">
-            <a href="/blog/2014/10/01/redis/#more">Read More</a>
-          </p>
-        
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/10/01/redis/" data-id="9s8ph2jfx0fw04xe" class="article-share-link">Share</a>
-      
-        <a href="http://guanxinquan.github.io/blog/2014/10/01/redis/#disqus_thread" class="article-comment-link">Comments</a>
-      
-      
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/redis/">redis</a></li></ul>
-
-    </footer>
-  </div>
   
 </article>
 
 
-  
-    <article id="post-gc" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/blog/2014/07/10/gc/" class="article-date">
-  <time datetime="2014-07-10T14:37:01.000Z" itemprop="datePublished">Jul 10 2014</time>
-</a>
-    
-  <div class="article-category">
-    <a class="article-category-link" href="/blog/categories/算法/">算法</a>
+<section id="comments">
+  <div id="disqus_thread">
+    <noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
   </div>
-
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/blog/2014/07/10/gc/">java 虚拟机垃圾回收原理</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h1 id="1-_垃圾回收的基本概念">1. 垃圾回收的基本概念</h1>
-<p>垃圾回收器主要负责：</p>
-<ol>
-<li>为对象分配内存；</li>
-<li>确保可执行代码能够访问到的对象保留在内存中；</li>
-<li>无法被可执行代码访问到的对象占用的空间得到释放。<br>
-        
-          <p class="article-more-link">
-            <a href="/blog/2014/07/10/gc/#more">Read More</a>
-          </p>
-        
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="b4uk2y7j4o2kl97l" class="article-share-link">Share</a>
-      
-        <a href="http://guanxinquan.github.io/blog/2014/07/10/gc/#disqus_thread" class="article-comment-link">Comments</a>
-      
-      
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/gc/">gc</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-lucene_FST_parser" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/blog/2014/06/17/lucene_FST_parser/" class="article-date">
-  <time datetime="2014-06-17T09:39:40.000Z" itemprop="datePublished">Jun 17 2014</time>
-</a>
-    
-  <div class="article-category">
-    <a class="article-category-link" href="/blog/categories/算法/">算法</a>
-  </div>
-
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/blog/2014/06/17/lucene_FST_parser/">lucene中的FST算法分析</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h1 id="前言">前言</h1>
-<p>FST（Finite State Transducer，一种有限自动机，或者称为Mealy machine）是lucene中的一个核心算法，用于检索term信息存储的位置。在lucene中，term按照文本的字典顺序排序，term其它相关信息按次序存储在磁盘上。在Lucene运行过程中，由term文本构成的FST存放在内存中，通过FST能够检索出term在硬盘中的具体存储位置。</p>
-<p>在FST构建过程中，term的文本信息(按照字典顺序排序）作为FST的input，term的存储位置（或者次序）作为FST的output，<input,output>二元组将以FST的形式存储在内存中（<strong>请注意input和output都是有序的</strong>）。检索时，根据input，通过计算FST中的路径上的权值信息，获取到output数据，最终在磁盘上定位term的其它附加信息。同时FST还能够快速的判断一个term是否在lucene中。<br>
-        
-          <p class="article-more-link">
-            <a href="/blog/2014/06/17/lucene_FST_parser/#more">Read More</a>
-          </p>
-        
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="8pbyx3m32a34p253" class="article-share-link">Share</a>
-      
-        <a href="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/#disqus_thread" class="article-comment-link">Comments</a>
-      
-      
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/fst/">fst</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-firstblog" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/blog/2014/06/17/firstblog/" class="article-date">
-  <time datetime="2014-06-17T06:58:01.000Z" itemprop="datePublished">Jun 17 2014</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/blog/2014/06/17/firstblog/">青春纪念</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>今天开始在这里写博客了，留个影，纪念一下。</p>
-<p>
-        
-          <p class="article-more-link">
-            <a href="/blog/2014/06/17/firstblog/#more">Read More</a>
-          </p>
-        
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/firstblog/" data-id="xigtmksap0rqkta0" class="article-share-link">Share</a>
-      
-        <a href="http://guanxinquan.github.io/blog/2014/06/17/firstblog/#disqus_thread" class="article-comment-link">Comments</a>
-      
-      
-  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/生活/">生活</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-  
+</section>
 </section>
         
           <aside id="sidebar">
@@ -463,11 +294,13 @@ multiplier *= <span class="number">128</span>
 <script>
   var disqus_shortname = 'httpguanxinquangithubio';
   
+  var disqus_url = 'http://guanxinquan.github.io/blog/2014/10/01/mqtt/';
+  
   (function(){
     var dsq = document.createElement('script');
     dsq.type = 'text/javascript';
     dsq.async = true;
-    dsq.src = '//go.disqus.com/count.js';
+    dsq.src = '//go.disqus.com/embed.js';
     (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
   })();
 </script>

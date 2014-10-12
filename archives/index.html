@@ -60,6 +60,103 @@
       <div class="outer">
         <section id="main">
   
+    <article id="post-mqtt" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/blog/2014/10/01/mqtt/" class="article-date">
+  <time datetime="2014-10-01T04:45:00.000Z" itemprop="datePublished">Oct 1 2014</time>
+</a>
+    
+  <div class="article-category">
+    <a class="article-category-link" href="/blog/categories/通信协议/">通信协议</a>
+  </div>
+
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/blog/2014/10/01/mqtt/">mqtt协议</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="2-_消息格式">2. 消息格式</h2>
+<p>所有mqtt消息都有固定头部（fix header）。一部分mqtt消息包含可变头部（variable header）和消息负载（payload）。下面的部分组要介绍mqtt消息的组成部分。</p>
+<h3 id="2-1_固定头部（fixed_header）">2.1 固定头部（fixed header）</h3>
+<p>所有mqtt消息都包含有fixed header，fixed header定义如下：</p>
+<p><img src="/blog/pic/mqtt/fix_header.png" alt="fix header"></p>
+<ol>
+<li>byte1 包含Message Type和Flags（DUP QOS RETAIN）。<br></li>
+<li><p>byte2 （至少包含一个byte）包括剩余字段的长度。所有的数据类型是以大端对齐(big-endian)高位字段排在低位字段的前面。例如一个16bit数字，在网络上以最高有效字节（MSB）在前，最低有效字节(LSB)在后的方式传输。</p>
+<h4 id="2-1-1_message_type">2.1.1  message type</h4>
+<p>在byte1中，bit7-4位表示消息的类型，如下表：<br><img src="/blog/pic/mqtt/message_type_1.png" alt="fix header"><br><img src="/blog/pic/mqtt/message_type_2.png" alt="fix header"></p>
+<h4 id="2-1-2_flags">2.1.2 flags</h4>
+<p>在byte1中剩下bits作为flags，分别表示DUP、QoS和RETAIN。<br><img src="/blog/pic/mqtt/flags.png" alt="fix header"><br><br><strong>Dup</strong>： 当客户端或者server尝试重新发送PUBLISH/PUBREL/SUBSCRIBE/UNSUBSCRIBE消息时，并且消息的QoS大于0，需要将DUP置位，表示这是一个重复发送的消息。当DUP被置位时，可变头部会包含一个MessageId字段。<br><br>接收端使用DUP确定消息是否可能已经被接收过的一个提示。但是这个flag不能用作检测消息是否真的被接收过。<br><br><strong>QOS</strong>:发送消息的QoS等级，如下表。<br><img src="/blog/pic/mqtt/qos.png" alt="fix header"><br><br><strong>RETAIN</strong>：这个flag用于PUBLISH消息。当客户端向服务端发送一个Retain被置位的消息，服务端接收消息并将消息下发在线接收者后，还需要保留消息。<br><br>当新客户端订阅topic时，当前topic下最后一条Retained消息将会下发给客户端，下发Retain消息时Retain flag置位；如果没有Retianed消息，就无需下发。<br><br>Retain消息可以用于report by exception，或者，希望新的订阅者能够立即接到最新的消息时使用。<br><br>当Retain消息发送给在线的订阅者时，Retain flag应当不置位，这有利于客户端区分这条消息是最新的（live的）而不是先前产生的。<br><br>在服务端从新启动后，要保证retained消息依然有效。<br><br>如果服务接到一个payload长度为0的Retained消息，server即可删除先前的Retain消息（即清空Retain消息）。</p>
+<h4 id="2-1-3_Remaining_length">2.1.3 Remaining length</h4>
+<p>剩余消息的长度包括可变消息头部和消息负载。<br><br>Remaining length由1-4个bytes组成，具体长度与表示的数值有关。其中每个byte的第一位是标识位，如果是0表示当前byte为Remaining length的最后一个byte，如果是0表示，当前byte后面还有额外的bytes表示长度。因此，如果是一个byte最大能表示0x7F（0111,1111）即127，两个byte能够表示0xFF 0x7F（1111 1111 0111 1111）转换成实际的二进制位( 111 1111 111 1111 -&gt; 11 1111 1111 1111 -&gt; 0x3F 0xFF）即为16383，因此能够表示的最大数字为0xFF 0xFF 0xFF 0x7F(1111 1111 1111 1111 1111 1111 0111 1111 -&gt; 1111 1111 1111 1111 1111 1111 1111-&gt;x0F 0xFF 0xFF 0xFF)即为268435455。如下表所示：<br><img src="/blog/pic/mqtt/remaining_length.png" alt="fix header"><br><br>数字转换成Remaining length</p>
+<p> do<br> digit = X MOD 128<br> X = X DIV 128<br> // if there are more digits to encode, set the top bit of this digit<br> if ( X &gt; 0 )<br> digit = digit OR 0x80<br> endif<br> ‘output’ digit<br> while ( X&gt; 0 )</p>
+</li>
+</ol>
+<p>Remaining length 转换为数字</p>
+<pre><code>multiplier = <span class="number">1</span>
+<span class="keyword">value</span> = <span class="number">0</span>
+<span class="keyword">do</span>
+digit = <span class="string">'next digit from stream'</span>
+<span class="keyword">value</span> += (digit AND <span class="number">127</span>) * multiplier
+multiplier *= <span class="number">128</span>
+<span class="keyword">while</span> ((digit AND <span class="number">128</span>) != <span class="number">0</span>)
+</code></pre><p>Remaining length的1-4bytes并不属于variable header，因此，Remaining length表示的长度不包含自己本身（1-4bytes）。</p>
+<h3 id="2-2_variable_header">2.2 variable header</h3>
+<p>一些类型的mqtt消息包含variable header，它位于fix header和payload之间。</p>
+<h4 id="2-2-1_Protocol_name">2.2.1 Protocol name</h4>
+<p>protocol name存在于MQTT CONNECT消息的variable header中。这个字段使用UTF-encoded String，内容为MQIsdp。</p>
+<h4 id="2-2-2_Protocol_Version">2.2.2 Protocol Version</h4>
+<p>Protocol version 存在于MQTT CONNECT消息的variable header中，使用8-bit无符号整数，表示当前客户端使用的mqtt协议版本，当前mqtt版本为3(0x03).<br><img src="/blog/pic/mqtt/protocol_version.png" alt="fix header"><br></p>
+<h4 id="2-2-3_Connect_flags">2.2.3 Connect flags</h4>
+<p>Connect flags 由clean session，will，will Qos和Retainflags表示，存在于connect消息的variable header中。<br><strong>clean session flag</strong>：如果设置为0，当客户端离线时，服务器需要存储其订阅的QoS1和QoS2消息，当客户端再次连接时，可以接收这些离线消息，同时service需要处理在客户端断开连接时正在发送的消息（in-flight），这些消息需要一直保留到客户端下次重新连接。<br><br>如果clean session flag置位，服务器在客户端连接时必须抛弃所有先前和客户端相关的信息，当客户端断开连接后，服务器要清除任何和客户端相关的信息。<br><br>通常，一个客户端只会使用一种模式，并且与具体的应用场景有关。clean session client不会接受过期的消息，并且每次连接的时候需要从新订阅相应的topic。non-clean session client将不会丢失任何QoS1和QoS2消息，即使是在他离线情况时发送的消息。<br><br>这个flag原名为“clean start”，现在重新命名，以区分他的作用范围为整个连接过程，而不仅仅是初始链接过程。<br><br>服务器可以有一些策略用户清理那些可能永远都不会重新连接的客户端相关的信息。</p>
+<p><img src="/blog/pic/mqtt/clean_session.png" alt="fix header"><br><br><strong>Will flag</strong>：will flag置位，当服务端与客户端交互过程中遇到ioerror，或者客户端在keep alive timer时间内失去连接，服务端会以客户端的名义往指定的topic下面发送一个消息。如果客户端发送disconnect消息断开连接，则不会触发will消息。<br><br>如果will flag 置位，will QoS，will Retain在connect flags中必须出现，并且will topic和will message fields必须出现在payload中。<br><br><strong>will QoS</strong>：只有will flag被置位，will QoS才有意义，will QoS可以取值0,1,2.表示异常情况下，服务端代发的will消息的QoS<br><br><strong>will Retain flag</strong>:与will QoS相似，仅有will flag被置位时，才有意义，表示异常情况下，服务端代发的will消息的QoS<br><br><strong>User name和Password flags</strong>：客户端链接过程可以指定user name和password，将user name和password置位，那面user name和password就会下connect的payload中。<br><br>如果user name置位，那么user name必须在payload中，同理，如果password置位，password必须在payload中，仅设置password不设置user name是无效的。</p>
+<h4 id="2-2-4_keep_Alive_timer">2.2.4 keep Alive timer</h4>
+<p>Keep Alive timer存在于Mqtt connect的可变头部中。<br><br>Keep Alive timer以分钟为单位，定义从客户端接收消息最大的时间间隔。保证服务器能够有效的监测客户端已经断开连接，而不是等待很长时间的TCP/IP超时。<br><br>客户端需要保证在Keep Alive time周期内向服务端发送消息，即使客户端没有需要向服务端提交的数据，也要发送PINGREQ消息，服务端回馈客户端PINGRESP消息<br><br>如果服务端在1.5倍的Keep alive time周期内没有接收到客户端的任何消息，服务端断开与客户端的链接。<br><br>同理，如果客户端发送PINGREQ后，在Keep Alive time周期内没有收到服务端的PINGRESP，客户端盈动断开socket链接。<br><br>Keep Alive time由16bit的值表示，以分钟为单位。根据应用场景的不同，设置不同的值，通常设置为几分钟，最大时间可以设置为18小时，设置为0，表示客户端不会断开链接。<br><img src="/blog/pic/mqtt/keep_alive.png" alt="fix header"><br></p>
+<h4 id="2-2-5_connect_return_code">2.2.5 connect return code</h4>
+<p>connect return code 存在于CONNACK消息的variable header中。定义为一个byte无符号数值,0表示成功。<br><img src="/blog/pic/mqtt/return_code.png" alt="fix header"><br></p>
+<h4 id="2-2-6_topic_name">2.2.6 topic name</h4>
+<p>topic name存在于PUBLISH消息的可变头部中。<br><br>topic name定义了payload发往的通道信息。订阅者使用topic name说明要接受的信息通道。topic name是一个utf-8 string。最长可为32767.</p>
+<h3 id="2-3_Payload">2.3 Payload</h3>
+<p>下面的消息具有payload。</p>
+<h4 id="2-3-1_connect">2.3.1 connect</h4>
+<p>payload包含一个或多个UTF-8string，包括client unqiue id，will topic，will message，user name，password。除了client unqiue id外，其他都是可选的，这与variable header中的flag有关。</p>
+<h4 id="2-3-2_subscribe">2.3.2 subscribe</h4>
+<p>包含客户端希望订阅的topic的名字和QoS级别，使用UTF-encoded。</p>
+<h4 id="2-3-3_suback">2.3.3 suback</h4>
+<p>包含一个QoS级别列表，服务端保证客户端可以接受topic的一个Qos级别列表，并且次序与subscribe一致。</p>
+<h4 id="2-3-4_publish">2.3.4 publish</h4>
+<p>publish payload仅包含应用程序相关的数据，并且这部分数据被作为一个Blob。如果应用程序需要理解payload中的数据，应用程序需要单独定义payload字段的解析规则，不能通过修改fixheader或者variableheader中的字段。</p>
+<h3 id="2-4_message_identifiers">2.4 message identifiers</h3>
+<p>message identifier会攒在与PUBLISH/PUBACK/PUBREC/PUBREL/PUBCOM/SUBSCRIBE/SUBACK/UNSUBSCRIBE/UNSUBACK中。</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://guanxinquan.github.io/blog/2014/10/01/mqtt/" data-id="gxwyum8gm6hlp5wy" class="article-share-link">Share</a>
+      
+        <a href="http://guanxinquan.github.io/blog/2014/10/01/mqtt/#disqus_thread" class="article-comment-link">Comments</a>
+      
+      
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/mqtt/">mqtt</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
     <article id="post-redis" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/blog/2014/10/01/redis/" class="article-date">
@@ -105,7 +202,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/10/01/redis/" data-id="ffqk1adsmjw9lvwe" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/10/01/redis/" data-id="9s8ph2jfx0fw04xe" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/10/01/redis/#disqus_thread" class="article-comment-link">Comments</a>
       
@@ -159,7 +256,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="cq37sipwybeqqbay" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/07/10/gc/" data-id="b4uk2y7j4o2kl97l" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/07/10/gc/#disqus_thread" class="article-comment-link">Comments</a>
       
@@ -210,7 +307,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="9hs0n5ys1psiyht8" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/" data-id="8pbyx3m32a34p253" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/06/17/lucene_FST_parser/#disqus_thread" class="article-comment-link">Comments</a>
       
@@ -256,7 +353,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/firstblog/" data-id="5vofwi4eqarbgfi8" class="article-share-link">Share</a>
+      <a data-url="http://guanxinquan.github.io/blog/2014/06/17/firstblog/" data-id="xigtmksap0rqkta0" class="article-share-link">Share</a>
       
         <a href="http://guanxinquan.github.io/blog/2014/06/17/firstblog/#disqus_thread" class="article-comment-link">Comments</a>
       
@@ -279,7 +376,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Categories</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/blog/categories/算法/">算法</a><span class="category-list-count">3</span></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/blog/categories/算法/">算法</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/blog/categories/通信协议/">通信协议</a><span class="category-list-count">1</span></li></ul>
     </div>
   </div>
 
@@ -288,7 +385,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Tags</h3>
     <div class="widget">
-      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/fst/">fst</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/gc/">gc</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/redis/">redis</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/生活/">生活</a><span class="tag-list-count">1</span></li></ul>
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/fst/">fst</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/gc/">gc</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/mqtt/">mqtt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/redis/">redis</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/blog/tags/生活/">生活</a><span class="tag-list-count">1</span></li></ul>
     </div>
   </div>
 
@@ -297,7 +394,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Tag Cloud</h3>
     <div class="widget tagcloud">
-      <a href="/blog/tags/fst/" style="font-size: NaNpx;">fst</a><a href="/blog/tags/gc/" style="font-size: NaNpx;">gc</a><a href="/blog/tags/redis/" style="font-size: NaNpx;">redis</a><a href="/blog/tags/生活/" style="font-size: NaNpx;">生活</a>
+      <a href="/blog/tags/fst/" style="font-size: NaNpx;">fst</a><a href="/blog/tags/gc/" style="font-size: NaNpx;">gc</a><a href="/blog/tags/mqtt/" style="font-size: NaNpx;">mqtt</a><a href="/blog/tags/redis/" style="font-size: NaNpx;">redis</a><a href="/blog/tags/生活/" style="font-size: NaNpx;">生活</a>
     </div>
   </div>
 
@@ -306,7 +403,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Archives</h3>
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/blog/archives/2014/10">October 2014</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/blog/archives/2014/07">July 2014</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/blog/archives/2014/06">June 2014</a><span class="archive-list-count">2</span></li></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/blog/archives/2014/10">October 2014</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/blog/archives/2014/07">July 2014</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/blog/archives/2014/06">June 2014</a><span class="archive-list-count">2</span></li></ul>
     </div>
   </div>
 
@@ -316,6 +413,10 @@
     <h3 class="widget-title">Recents</h3>
     <div class="widget">
       <ul>
+        
+          <li>
+            <a href="/blog/2014/10/01/mqtt/">mqtt协议</a>
+          </li>
         
           <li>
             <a href="/blog/2014/10/01/redis/">redis 算法研究</a>
